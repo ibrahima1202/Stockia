@@ -27,6 +27,10 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'quincaillerie-auth',
       partialize: (state) => ({ profile: state.profile }),
+      // CORRIGÉ : isLoading toujours réinitialisé à true au démarrage
+      onRehydrateStorage: () => (state) => {
+        if (state) state.isLoading = true
+      },
     }
   )
 )
