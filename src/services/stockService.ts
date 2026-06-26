@@ -28,11 +28,11 @@ export const stockService = {
     type: StockMovementType,
     quantity: number,
     reason?: string,
-    reference?: string
+    reference?: string,
+    userId?: string
   ): Promise<StockMovement> {
     const ref = reference || generateReference(type === 'entree' ? 'ENT' : 'SOR')
 
-    // Get current stock
     const { data: product, error: productError } = await supabase
       .from('products')
       .select('stock_current')
@@ -40,12 +40,10 @@ export const stockService = {
       .single()
     if (productError) throw productError
 
-    // Check sufficient stock for sortie
     if (type === 'sortie' && product.stock_current < quantity) {
       throw new Error(`Stock insuffisant. Stock actuel: ${product.stock_current}`)
     }
 
-    // Insert movement
     const { data: movement, error: movError } = await supabase
       .from('stock_movements')
       .insert({
@@ -54,12 +52,12 @@ export const stockService = {
         quantity,
         reason,
         reference: ref,
+        created_by: userId ?? null,
       })
       .select('*, product:products(name, reference)')
       .single()
     if (movError) throw movError
 
-    // Update product stock
     const newStock =
       type === 'entree'
         ? product.stock_current + quantity
