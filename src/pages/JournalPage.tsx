@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookOpen, Download } from 'lucide-react'
+import { BookOpen } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   Badge, EmptyState, Card
