@@ -2,14 +2,14 @@ import { useState, useMemo } from 'react'
 import { Plus, Minus, Trash2, ShoppingCart, Receipt } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
-  Badge, Modal, EmptyState, Card
+  Badge, EmptyState, Card
 } from '@/components/ui/index'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { useSales } from '@/hooks/useSales'
 import { useProducts } from '@/hooks/useProducts'
 import { formatCurrency, formatDateTime, formatPaymentMethod } from '@/lib/utils'
-import type { Product, SaleCartItem, PaymentMethod } from '@/types'
+import type { SaleCartItem, PaymentMethod } from '@/types'
 import { useToast } from '@/store/toastStore'
 
 export default function SalesPage() {
@@ -17,7 +17,6 @@ export default function SalesPage() {
   const { products } = useProducts()
   const toast = useToast()
 
-  const [, setCartOpen] = useState(false)
   const [cart, setCart] = useState<SaleCartItem[]>([])
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('especes')
   const [notes, setNotes] = useState('')
@@ -171,7 +170,6 @@ export default function SalesPage() {
 
       {activeTab === 'new' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Product selector */}
           <div className="lg:col-span-2 space-y-4">
             <Card className="p-4">
               <h3 className="font-medium text-sm mb-3">Ajouter un produit</h3>
@@ -203,7 +201,6 @@ export default function SalesPage() {
               </div>
             </Card>
 
-            {/* Cart table */}
             <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
               {cart.length === 0 ? (
                 <EmptyState icon={ShoppingCart} title="Panier vide" description="Ajoutez des produits pour créer une vente" />
@@ -260,7 +257,6 @@ export default function SalesPage() {
             </div>
           </div>
 
-          {/* Order summary */}
           <div className="space-y-4">
             <Card className="p-4 space-y-4">
               <h3 className="font-semibold">Récapitulatif</h3>
