@@ -1,5 +1,4 @@
 import { saleService } from './saleService'
-import { expenseService } from './expenseService'
 import { productService } from './productService'
 import { journalService } from './journalService'
 import type { DashboardStats } from '@/types'
