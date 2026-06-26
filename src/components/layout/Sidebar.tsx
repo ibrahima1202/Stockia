@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Package, Warehouse, ShoppingCart,
-  BookOpen, Receipt, LogOut, Menu, X, Wrench
+  BookOpen, Receipt, LogOut, Menu, X
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
@@ -32,14 +32,22 @@ export function Sidebar({ onSignOut }: SidebarProps) {
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="px-4 py-5 border-b border-steel-800">
+      <div className="px-4 py-5 border-b border-slate-800">
         <div className="flex items-center gap-2.5">
-          <div className="rounded-md bg-orange-500 p-1.5">
-            <Wrench className="h-4 w-4 text-white" />
-          </div>
+          <svg viewBox="0 0 44 44" width="44" height="44" xmlns="http://www.w3.org/2000/svg">
+            <rect width="44" height="44" rx="8" fill="#0f172a"/>
+            <rect x="7" y="22" width="30" height="18" rx="2" fill="#f97316"/>
+            <polygon points="4,22 22,10 40,22" fill="#fb923c"/>
+            <rect x="17" y="28" width="10" height="12" rx="1" fill="#0f172a"/>
+            <rect x="9" y="24" width="6" height="5" rx="1" fill="#fed7aa"/>
+            <rect x="29" y="24" width="6" height="5" rx="1" fill="#fed7aa"/>
+            <circle cx="37" cy="13" r="4" fill="#22c55e"/>
+          </svg>
           <div>
-            <p className="text-white font-bold text-sm leading-tight">Quincaillerie</p>
-            <p className="text-steel-300 text-xs">Pro</p>
+            <p className="text-white font-bold text-sm leading-tight">
+              STOCK<span className="text-orange-500">AM</span>
+            </p>
+            <p className="text-slate-400 text-xs">Gestion de stock</p>
           </div>
         </div>
       </div>
@@ -59,7 +67,7 @@ export function Sidebar({ onSignOut }: SidebarProps) {
                 'flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors',
                 isActive
                   ? 'bg-orange-500 text-white'
-                  : 'text-steel-200 hover:bg-steel-800 hover:text-white'
+                  : 'text-slate-200 hover:bg-slate-800 hover:text-white'
               )}
             >
               <item.icon className="h-4 w-4 shrink-0" />
@@ -70,14 +78,14 @@ export function Sidebar({ onSignOut }: SidebarProps) {
       </nav>
 
       {/* User info + logout */}
-      <div className="px-3 py-4 border-t border-steel-800">
+      <div className="px-3 py-4 border-t border-slate-800">
         <div className="mb-2 px-2">
           <p className="text-white text-sm font-medium truncate">{profile?.full_name}</p>
-          <p className="text-steel-400 text-xs capitalize">{profile?.role}</p>
+          <p className="text-slate-400 text-xs capitalize">{profile?.role}</p>
         </div>
         <button
           onClick={onSignOut}
-          className="flex w-full items-center gap-3 px-3 py-2 rounded-md text-sm text-steel-300 hover:bg-steel-800 hover:text-white transition-colors"
+          className="flex w-full items-center gap-3 px-3 py-2 rounded-md text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
         >
           <LogOut className="h-4 w-4" />
           Déconnexion
@@ -89,14 +97,14 @@ export function Sidebar({ onSignOut }: SidebarProps) {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex flex-col w-56 bg-steel-900 shrink-0 h-screen sticky top-0">
+      <aside className="hidden lg:flex flex-col w-56 bg-slate-900 shrink-0 h-screen sticky top-0">
         <SidebarContent />
       </aside>
 
       {/* Mobile hamburger */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-3 left-3 z-40 p-2 bg-steel-900 text-white rounded-md"
+        className="lg:hidden fixed top-3 left-3 z-40 p-2 bg-slate-900 text-white rounded-md shadow-md"
       >
         <Menu className="h-5 w-5" />
       </button>
@@ -104,7 +112,7 @@ export function Sidebar({ onSignOut }: SidebarProps) {
       {/* Mobile drawer */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="w-56 bg-steel-900 h-full">
+          <div className="w-56 bg-slate-900 h-full">
             <div className="flex justify-end p-3">
               <button onClick={() => setMobileOpen(false)} className="text-white">
                 <X className="h-5 w-5" />
