@@ -12,7 +12,9 @@ export function useAuth() {
   const toast = useToast()
 
   useEffect(() => {
-    // CORRIGÉ : try/catch + finally garantit que setLoading(false) est toujours appelé
+    // Timeout de sécurité : force isLoading=false après 5 secondes max
+    const timeout = setTimeout(() => setLoading(false), 5000)
+
     const initSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
@@ -25,6 +27,7 @@ export function useAuth() {
         }
       } catch {}
       finally {
+        clearTimeout(timeout)
         setLoading(false)
       }
     }
@@ -46,7 +49,10 @@ export function useAuth() {
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      clearTimeout(timeout)
+      subscription.unsubscribe()
+    }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const signIn = async (email: string, password: string) => {
