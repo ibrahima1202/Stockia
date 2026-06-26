@@ -81,7 +81,7 @@ export const saleService = {
         .eq('id', item.product.id)
       if (stockError) throw stockError
 
-      await supabase.from('stock_movements').insert({
+      const { error: movError } = await supabase.from('stock_movements').insert({
         product_id: item.product.id,
         type: 'sortie',
         quantity: item.quantity,
@@ -89,9 +89,10 @@ export const saleService = {
         reference,
         created_by: userId,
       })
+      if (movError) throw movError
     }
 
-    await supabase.from('journal_entries').insert({
+    const { error: journalError } = await supabase.from('journal_entries').insert({
       entry_date: dateFormat(new Date(), 'yyyy-MM-dd'),
       reference,
       label: `Vente - ${payload.items.map((i) => i.product.name).join(', ')}`,
@@ -100,11 +101,45 @@ export const saleService = {
       source_type: 'vente',
       source_id: sale.id,
     })
+    if (journalError) throw journalError
 
     return sale
   },
 
   async delete(id: string): Promise<void> {
+    const { data: sale, error: fetchError } = await supabase
+      .from('sales')
+      .select('reference, sale_items(product_id, quantity)')
+      .eq('id', id)
+      .single()
+    if (fetchError) throw fetchError
+
+    for (const item of (sale.sale_items || [])) {
+      const { data: product, error: pError } = await supabase
+        .from('products')
+        .select('stock_current')
+        .eq('id', item.product_id)
+        .single()
+      if (pError) throw pError
+
+      const { error: stockError } = await supabase
+        .from('products')
+        .update({ stock_current: product.stock_current + item.quantity })
+        .eq('id', item.product_id)
+      if (stockError) throw stockError
+    }
+
+    await supabase
+      .from('journal_entries')
+      .delete()
+      .eq('source_type', 'vente')
+      .eq('source_id', id)
+
+    await supabase
+      .from('stock_movements')
+      .delete()
+      .eq('reference', sale.reference)
+
     const { error } = await supabase.from('sales').delete().eq('id', id)
     if (error) throw error
   },
