@@ -1,0 +1,126 @@
+import { supabase } from '@/lib/supabase'
+import type { Product, Category } from '@/types'
+
+export const productService = {
+  async getAll(): Promise<Product[]> {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*, category:categories(*)')
+      .order('name')
+    if (error) throw error
+    return data
+  },
+
+  async getActive(): Promise<Product[]> {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*, category:categories(*)')
+      .eq('is_active', true)
+      .order('name')
+    if (error) throw error
+    return data
+  },
+
+  async getLowStock(): Promise<Product[]> {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*, category:categories(*)')
+      .filter('stock_current', 'lte', supabase.rpc('get_low_stock_products'))
+      .eq('is_active', true)
+    // Fallback: fetch all and filter
+    if (error) {
+      const { data: allData, error: allError } = await supabase
+        .from('products')
+        .select('*, category:categories(*)')
+        .eq('is_active', true)
+      if (allError) throw allError
+      return (allData || []).filter(
+        (p: Product) => p.stock_current <= p.stock_minimum
+      )
+    }
+    return data || []
+  },
+
+  async getLowStockCount(): Promise<number> {
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, stock_current, stock_minimum')
+      .eq('is_active', true)
+    if (error) throw error
+    return (data || []).filter(
+      (p) => p.stock_current <= p.stock_minimum
+    ).length
+  },
+
+  async getById(id: string): Promise<Product> {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*, category:categories(*)')
+      .eq('id', id)
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async create(
+    product: Omit<Product, 'id' | 'created_at' | 'updated_at' | 'category'>
+  ): Promise<Product> {
+    const { data, error } = await supabase
+      .from('products')
+      .insert(product)
+      .select('*, category:categories(*)')
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async update(
+    id: string,
+    updates: Partial<Omit<Product, 'id' | 'created_at' | 'updated_at' | 'category'>>
+  ): Promise<Product> {
+    const { data, error } = await supabase
+      .from('products')
+      .update(updates)
+      .eq('id', id)
+      .select('*, category:categories(*)')
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('products')
+      .update({ is_active: false })
+      .eq('id', id)
+    if (error) throw error
+  },
+
+  async updateStock(id: string, newStock: number): Promise<void> {
+    const { error } = await supabase
+      .from('products')
+      .update({ stock_current: newStock })
+      .eq('id', id)
+    if (error) throw error
+  },
+
+  // Categories
+  async getCategories(): Promise<Category[]> {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .order('name')
+    if (error) throw error
+    return data
+  },
+
+  async createCategory(name: string): Promise<Category> {
+    const { data, error } = await supabase
+      .from('categories')
+      .insert({ name })
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+}
