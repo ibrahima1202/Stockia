@@ -17,7 +17,7 @@ export default function SalesPage() {
   const { products } = useProducts()
   const toast = useToast()
 
-  const [cartOpen, setCartOpen] = useState(false)
+  const [, setCartOpen] = useState(false)
   const [cart, setCart] = useState<SaleCartItem[]>([])
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('especes')
   const [notes, setNotes] = useState('')
