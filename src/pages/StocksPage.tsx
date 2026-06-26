@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { Plus, Minus, ArrowUpDown, AlertTriangle } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
-  Badge, Modal, Card
+  Badge, Modal
 } from '@/components/ui/index'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
