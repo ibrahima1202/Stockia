@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback } from 'react'
 import { stockService } from '@/services/stockService'
 import type { StockMovement, StockMovementType } from '@/types'
 import { useToast } from '@/store/toastStore'
+import { useAuthStore } from '@/store/authStore'
 
 export function useStocks() {
   const [movements, setMovements] = useState<StockMovement[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const toast = useToast()
+  const { user } = useAuthStore()
 
   const load = useCallback(async () => {
     try {
@@ -28,7 +30,7 @@ export function useStocks() {
     quantity: number,
     reason?: string
   ) => {
-    const movement = await stockService.addMovement(productId, type, quantity, reason)
+    const movement = await stockService.addMovement(productId, type, quantity, reason, undefined, user?.id)
     setMovements((prev) => [movement, ...prev])
     toast.success(
       type === 'entree' ? 'Entrée de stock enregistrée' : 'Sortie de stock enregistrée'
