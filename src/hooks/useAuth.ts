@@ -12,21 +12,25 @@ export function useAuth() {
   const toast = useToast()
 
   useEffect(() => {
-    // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user)
-        authService
-          .getProfile(session.user.id)
-          .then(setProfile)
-          .catch(() => {})
-          .finally(() => setLoading(false))
-      } else {
+    // CORRIGÉ : try/catch + finally garantit que setLoading(false) est toujours appelé
+    const initSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user) {
+          setUser(session.user)
+          try {
+            const p = await authService.getProfile(session.user.id)
+            setProfile(p)
+          } catch {}
+        }
+      } catch {}
+      finally {
         setLoading(false)
       }
-    })
+    }
 
-    // Listen to auth changes
+    initSession()
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
