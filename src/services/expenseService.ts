@@ -29,9 +29,8 @@ export const expenseService = {
       .single()
     if (error) throw error
 
-    // Add journal entry automatically
     const reference = generateReference('DEP')
-    await supabase.from('journal_entries').insert({
+    const { error: journalError } = await supabase.from('journal_entries').insert({
       entry_date: expense.expense_date,
       reference,
       label: `Dépense ${expense.category} - ${expense.description}`,
@@ -40,6 +39,7 @@ export const expenseService = {
       source_type: 'depense',
       source_id: data.id,
     })
+    if (journalError) throw journalError
 
     return data
   },
@@ -64,6 +64,12 @@ export const expenseService = {
   },
 
   async delete(id: string): Promise<void> {
+    await supabase
+      .from('journal_entries')
+      .delete()
+      .eq('source_type', 'depense')
+      .eq('source_id', id)
+
     const { error } = await supabase.from('expenses').delete().eq('id', id)
     if (error) throw error
   },
