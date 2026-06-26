@@ -25,20 +25,11 @@ export const productService = {
     const { data, error } = await supabase
       .from('products')
       .select('*, category:categories(*)')
-      .filter('stock_current', 'lte', supabase.rpc('get_low_stock_products'))
       .eq('is_active', true)
-    // Fallback: fetch all and filter
-    if (error) {
-      const { data: allData, error: allError } = await supabase
-        .from('products')
-        .select('*, category:categories(*)')
-        .eq('is_active', true)
-      if (allError) throw allError
-      return (allData || []).filter(
-        (p: Product) => p.stock_current <= p.stock_minimum
-      )
-    }
-    return data || []
+    if (error) throw error
+    return (data || []).filter(
+      (p: Product) => p.stock_current <= p.stock_minimum
+    )
   },
 
   async getLowStockCount(): Promise<number> {
@@ -104,7 +95,6 @@ export const productService = {
     if (error) throw error
   },
 
-  // Categories
   async getCategories(): Promise<Category[]> {
     const { data, error } = await supabase
       .from('categories')
