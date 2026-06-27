@@ -57,3 +57,34 @@ export function Sidebar({ onSignOut }: SidebarProps) {
           return (
             <NavLink
               key={item.to}
+              to={item.to}
+              className={cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors',
+                isActive
+                  ? 'bg-orange-500 text-white'
+                  : 'text-slate-200 hover:bg-slate-800 hover:text-white'
+              )}
+            >
+              <item.icon className="h-4 w-4 shrink-0" />
+              {item.label}
+            </NavLink>
+          )
+        })}
+      </nav>
+
+      <div className="px-3 py-4 border-t border-slate-800">
+        <div className="mb-2 px-2">
+          <p className="text-white text-sm font-medium truncate">{profile?.full_name}</p>
+          <p className="text-slate-400 text-xs capitalize">{profile?.role}</p>
+        </div>
+        <button
+          onClick={onSignOut}
+          className="flex w-full items-center gap-3 px-3 py-2 rounded-md text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+        >
+          <LogOut className="h-4 w-4" />
+          Déconnexion
+        </button>
+      </div>
+    </aside>
+  )
+}
