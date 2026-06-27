@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { TrendingUp, ShoppingCart, AlertTriangle, Wallet, RefreshCw, ArrowRight } from 'lucide-react'
-import { LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge } from '@/components/ui/index'
+import { LoadingScreen, Badge } from '@/components/ui/index'
 import { dashboardService } from '@/services/dashboardService'
 import { productService } from '@/services/productService'
 import { saleService } from '@/services/saleService'
