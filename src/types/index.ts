@@ -1,9 +1,7 @@
 // ============================================================
 // QUINCAILLERIE PRO — Types TypeScript
 // ============================================================
-
 export type UserRole = 'admin' | 'caissier'
-
 export interface Profile {
   id: string
   full_name: string
@@ -11,13 +9,11 @@ export interface Profile {
   created_at: string
   updated_at: string
 }
-
 export interface Category {
   id: string
   name: string
   created_at: string
 }
-
 export interface Product {
   id: string
   name: string
@@ -33,9 +29,7 @@ export interface Product {
   // Joined
   category?: Category
 }
-
 export type StockMovementType = 'entree' | 'sortie'
-
 export interface StockMovement {
   id: string
   product_id: string
@@ -49,22 +43,24 @@ export interface StockMovement {
   product?: Product
   profile?: Profile
 }
-
 export type PaymentMethod = 'especes' | 'mobile_money' | 'carte'
-
+export type SaleStatut = 'paye' | 'credit' | 'partiel'
 export interface Sale {
   id: string
   reference: string
   total_amount: number
   payment_method: PaymentMethod
   notes?: string
+  client_id?: string | null
+  montant_paye?: number
+  statut?: SaleStatut
   created_by?: string
   created_at: string
   // Joined
   sale_items?: SaleItem[]
   profile?: Profile
+  client?: Client
 }
-
 export interface SaleItem {
   id: string
   sale_id: string
@@ -76,9 +72,7 @@ export interface SaleItem {
   // Joined
   product?: Product
 }
-
 export type ExpenseCategory = 'transport' | 'loyer' | 'divers'
-
 export interface Expense {
   id: string
   category: ExpenseCategory
@@ -90,9 +84,7 @@ export interface Expense {
   // Joined
   profile?: Profile
 }
-
-export type JournalSourceType = 'vente' | 'depense' | 'manuel'
-
+export type JournalSourceType = 'vente' | 'depense' | 'manuel' | 'reglement_client' | 'reglement_fournisseur' | 'achat_fournisseur'
 export interface JournalEntry {
   id: string
   entry_date: string
@@ -104,6 +96,77 @@ export interface JournalEntry {
   source_type?: JournalSourceType
   source_id?: string
   created_at: string
+}
+
+// ============================================================
+// CLIENT
+// ============================================================
+export interface Client {
+  id: string
+  name: string
+  phone?: string
+  address?: string
+  notes?: string
+  solde: number
+  created_by?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ReglementClient {
+  id: string
+  client_id: string
+  sale_id?: string | null
+  montant: number
+  payment_method: PaymentMethod
+  notes?: string
+  reglement_date: string
+  created_by?: string
+  created_at: string
+  // Joined
+  client?: Client
+}
+
+// ============================================================
+// FOURNISSEUR
+// ============================================================
+export interface Fournisseur {
+  id: string
+  name: string
+  phone?: string
+  address?: string
+  notes?: string
+  solde: number
+  created_by?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AchatFournisseur {
+  id: string
+  fournisseur_id: string
+  reference: string
+  montant_total: number
+  montant_paye: number
+  notes?: string
+  achat_date: string
+  created_by?: string
+  created_at: string
+  // Joined
+  fournisseur?: Fournisseur
+}
+
+export interface ReglementFournisseur {
+  id: string
+  fournisseur_id: string
+  montant: number
+  payment_method: PaymentMethod
+  notes?: string
+  reglement_date: string
+  created_by?: string
+  created_at: string
+  // Joined
+  fournisseur?: Fournisseur
 }
 
 // ============================================================
@@ -125,9 +188,11 @@ export interface SaleCartItem {
   unit_price: number
   total_price: number
 }
-
 export interface CreateSalePayload {
   items: SaleCartItem[]
   payment_method: PaymentMethod
   notes?: string
+  client_id?: string | null
+  montant_paye?: number
+  statut?: SaleStatut
 }
