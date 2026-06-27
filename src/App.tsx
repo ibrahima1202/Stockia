@@ -8,13 +8,14 @@ import StocksPage from '@/pages/StocksPage'
 import SalesPage from '@/pages/SalesPage'
 import JournalPage from '@/pages/JournalPage'
 import ExpensesPage from '@/pages/ExpensesPage'
+import ClientsPage from '@/pages/ClientsPage'
+import FournisseursPage from '@/pages/FournisseursPage'
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-
         <Route
           element={
             <ProtectedRoute>
@@ -27,6 +28,8 @@ export default function App() {
           <Route path="stocks" element={<StocksPage />} />
           <Route path="sales" element={<SalesPage />} />
           <Route path="journal" element={<JournalPage />} />
+          <Route path="clients" element={<ClientsPage />} />
+          <Route path="fournisseurs" element={<FournisseursPage />} />
           <Route
             path="expenses"
             element={
@@ -36,7 +39,6 @@ export default function App() {
             }
           />
         </Route>
-
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
