@@ -1,11 +1,10 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Package, Warehouse, ShoppingCart,
-  BookOpen, Receipt, LogOut, Menu, X
+  BookOpen, Receipt, LogOut
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
-import { useState } from 'react'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Tableau de bord', exact: true },
@@ -22,15 +21,14 @@ interface SidebarProps {
 
 export function Sidebar({ onSignOut }: SidebarProps) {
   const { profile } = useAuthStore()
-  const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
 
   const visibleItems = navItems.filter(
     (item) => !item.adminOnly || profile?.role === 'admin'
   )
 
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full">
+  return (
+    <aside className="hidden lg:flex flex-col w-56 bg-slate-900 shrink-0 h-screen sticky top-0">
       {/* Logo */}
       <div className="px-4 py-5 border-b border-slate-800">
         <div className="flex items-center gap-2.5">
@@ -62,7 +60,6 @@ export function Sidebar({ onSignOut }: SidebarProps) {
             <NavLink
               key={item.to}
               to={item.to}
-              onClick={() => setMobileOpen(false)}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors',
                 isActive
@@ -80,6 +77,20 @@ export function Sidebar({ onSignOut }: SidebarProps) {
       {/* User info + logout */}
       <div className="px-3 py-4 border-t border-slate-800">
         <div className="mb-2 px-2">
+          <p className="text-white text-sm font-medium truncate">{profile?.full_name}</p>
+          <p className="text-slate-400 text-xs capitalize">{profile?.role}</p>
+        </div>
+        <button
+          onClick={onSignOut}
+          className="flex w-full items-center gap-3 px-3 py-2 rounded-md text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+        >
+          <LogOut className="h-4 w-4" />
+          Déconnexion
+        </button>
+      </div>
+    </aside>
+  )
+}        <div className="mb-2 px-2">
           <p className="text-white text-sm font-medium truncate">{profile?.full_name}</p>
           <p className="text-slate-400 text-xs capitalize">{profile?.role}</p>
         </div>
