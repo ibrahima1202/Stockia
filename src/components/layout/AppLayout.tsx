@@ -1,34 +1,44 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Package, Warehouse, ShoppingCart, BookOpen } from 'lucide-react'
+import { LayoutDashboard, Package, Warehouse, ShoppingCart, MoreHorizontal, BookOpen, Users, Truck, Receipt, X } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { ToastContainer } from '@/components/ui/toast'
 import { useAuth } from '@/hooks/useAuth'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
+import { useState } from 'react'
 
 const bottomNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Accueil', exact: true },
   { to: '/products', icon: Package, label: 'Produits' },
   { to: '/stocks', icon: Warehouse, label: 'Stocks' },
   { to: '/sales', icon: ShoppingCart, label: 'Ventes' },
+]
+
+const moreNavItems = [
+  { to: '/clients', icon: Users, label: 'Clients' },
+  { to: '/fournisseurs', icon: Truck, label: 'Fournisseurs' },
   { to: '/journal', icon: BookOpen, label: 'Journal' },
+  { to: '/expenses', icon: Receipt, label: 'Dépenses' },
 ]
 
 export function AppLayout() {
   const { signOut } = useAuth()
   const { profile } = useAuthStore()
   const location = useLocation()
+  const [showMore, setShowMore] = useState(false)
+
+  const isMoreActive = moreNavItems.some((item) =>
+    location.pathname.startsWith(item.to)
+  )
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      {/* Sidebar desktop uniquement */}
       <Sidebar onSignOut={signOut} />
 
       <div className="flex-1 flex flex-col overflow-hidden">
 
-        {/* Entête mobile uniquement */}
+        {/* Entête mobile */}
         <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800">
-          {/* Logo */}
           <div className="flex items-center gap-2.5">
             <svg viewBox="0 0 44 44" width="36" height="36" xmlns="http://www.w3.org/2000/svg">
               <rect width="44" height="44" rx="8" fill="#0f172a"/>
@@ -46,8 +56,6 @@ export function AppLayout() {
               <p className="text-slate-400 text-xs">Gestion de stock</p>
             </div>
           </div>
-
-          {/* Bouton utilisateur */}
           <div className="flex items-center gap-2 bg-slate-800 rounded-full px-3 py-1.5">
             <div className="w-6 h-6 rounded-full bg-slate-600 flex items-center justify-center">
               <span className="text-white text-xs font-bold">
@@ -70,8 +78,46 @@ export function AppLayout() {
           </div>
         </main>
 
+        {/* Menu "Plus" overlay */}
+        {showMore && (
+          <div
+            className="lg:hidden fixed inset-0 z-40 bg-black/50"
+            onClick={() => setShowMore(false)}
+          >
+            <div
+              className="absolute bottom-16 left-0 right-0 bg-slate-900 border-t border-slate-800 px-4 py-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-slate-400 text-xs font-medium uppercase tracking-wide">Plus de fonctions</p>
+                <button onClick={() => setShowMore(false)}>
+                  <X className="h-4 w-4 text-slate-400" />
+                </button>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {moreNavItems.map((item) => {
+                  const isActive = location.pathname.startsWith(item.to)
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      onClick={() => setShowMore(false)}
+                      className="flex flex-col items-center gap-1.5 p-3 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+                    >
+                      <item.icon className={cn('h-5 w-5', isActive ? 'text-orange-500' : 'text-slate-300')} />
+                      <span className={cn('text-xs font-medium', isActive ? 'text-orange-500' : 'text-slate-300')}>
+                        {item.label}
+                      </span>
+                    </NavLink>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Barre de navigation mobile en bas */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900 border-t border-slate-800">
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-900 border-t border-slate-800">
           <div className="flex items-center justify-around px-2 py-2">
             {bottomNavItems.map((item) => {
               const isActive = item.exact
@@ -90,6 +136,16 @@ export function AppLayout() {
                 </NavLink>
               )
             })}
+            {/* Bouton Plus */}
+            <button
+              onClick={() => setShowMore(!showMore)}
+              className="flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <MoreHorizontal className={cn('h-5 w-5', isMoreActive || showMore ? 'text-orange-500' : 'text-slate-400')} />
+              <span className={cn('text-xs font-medium', isMoreActive || showMore ? 'text-orange-500' : 'text-slate-400')}>
+                Plus
+              </span>
+            </button>
           </div>
         </nav>
 
