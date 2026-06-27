@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { TrendingUp, ShoppingCart, AlertTriangle, Wallet, RefreshCw } from 'lucide-react'
-import { StatCard, LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge } from '@/components/ui/index'
-import { Button } from '@/components/ui/button'
+import { TrendingUp, ShoppingCart, AlertTriangle, Wallet, RefreshCw, ArrowRight } from 'lucide-react'
+import { LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge } from '@/components/ui/index'
 import { dashboardService } from '@/services/dashboardService'
 import { productService } from '@/services/productService'
 import { saleService } from '@/services/saleService'
-import { formatCurrency, formatDateTime } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils'
+import { useAuthStore } from '@/store/authStore'
+import { useNavigate } from 'react-router-dom'
 import type { DashboardStats, Product, Sale } from '@/types'
 
 export default function DashboardPage() {
@@ -13,9 +14,13 @@ export default function DashboardPage() {
   const [lowStockProducts, setLowStockProducts] = useState<Product[]>([])
   const [recentSales, setRecentSales] = useState<Sale[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const { profile } = useAuthStore()
+  const navigate = useNavigate()
 
-  const load = async () => {
-    setIsLoading(true)
+  const load = async (silent = false) => {
+    if (!silent) setIsLoading(true)
+    else setRefreshing(true)
     try {
       const [statsData, lowStock, sales] = await Promise.all([
         dashboardService.getStats(),
@@ -23,149 +28,192 @@ export default function DashboardPage() {
         saleService.getAll(5),
       ])
       setStats(statsData)
-      setLowStockProducts(lowStock.slice(0, 8))
+      setLowStockProducts(lowStock.slice(0, 5))
       setRecentSales(sales)
     } catch (err) {
       console.error(err)
     } finally {
       setIsLoading(false)
+      setRefreshing(false)
     }
   }
 
   useEffect(() => { load() }, [])
 
+  const now = new Date()
+  const greeting = now.getHours() < 12 ? 'Bonjour' : now.getHours() < 18 ? 'Bon après-midi' : 'Bonsoir'
+  const firstName = profile?.full_name?.split(' ')[0] ?? ''
+  const dateStr = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+
   if (isLoading) return <LoadingScreen text="Chargement du tableau de bord..." />
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="page-header">
+    <div className="space-y-5">
+
+      {/* Entête */}
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="page-title">Tableau de bord</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          <h1 className="text-xl font-bold text-foreground">
+            {greeting}{firstName ? `, ${firstName}` : ''} 👋
+          </h1>
+          <p className="text-sm text-muted-foreground capitalize mt-0.5">{dateStr}</p>
+        </div>
+        <button
+          onClick={() => load(true)}
+          disabled={refreshing}
+          className="p-2 rounded-lg border bg-white hover:bg-muted transition-colors"
+        >
+          <RefreshCw className={`h-4 w-4 text-muted-foreground ${refreshing ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      {/* 2 grandes cartes principales */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* CA du jour */}
+        <div className="col-span-1 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-4 text-white shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-medium text-emerald-100 uppercase tracking-wide">CA du jour</p>
+            <div className="bg-white/20 p-1.5 rounded-lg">
+              <TrendingUp className="h-4 w-4 text-white" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold leading-tight">
+            {formatCurrency(stats?.revenue_today ?? 0)}
           </p>
+          <p className="text-xs text-emerald-100 mt-1">Chiffre d'affaires</p>
         </div>
-        <Button variant="outline" size="sm" onClick={load}>
-          <RefreshCw className="h-4 w-4" />
-          Actualiser
-        </Button>
-      </div>
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="CA du jour"
-          value={formatCurrency(stats?.revenue_today ?? 0)}
-          subtitle="Chiffre d'affaires"
-          icon={TrendingUp}
-          iconColor="text-emerald-600"
-        />
-        <StatCard
-          title="Ventes du jour"
-          value={stats?.sales_count_today ?? 0}
-          subtitle="Transactions"
-          icon={ShoppingCart}
-          iconColor="text-blue-600"
-        />
-        <StatCard
-          title="Ruptures de stock"
-          value={stats?.low_stock_count ?? 0}
-          subtitle="Produits à réapprovisionner"
-          icon={AlertTriangle}
-          iconColor="text-orange-500"
-          alert={(stats?.low_stock_count ?? 0) > 0}
-        />
-        <StatCard
-          title="Solde de caisse"
-          value={formatCurrency(stats?.cash_balance ?? 0)}
-          subtitle="Solde journal"
-          icon={Wallet}
-          iconColor="text-purple-600"
-        />
-      </div>
-
-      {/* Bottom grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent sales */}
-        <div className="bg-white rounded-lg border shadow-sm">
-          <div className="px-5 py-4 border-b flex items-center justify-between">
-            <h2 className="font-semibold text-sm">Dernières ventes</h2>
-            <a href="/sales" className="text-xs text-primary hover:underline">Voir tout</a>
+        {/* Solde caisse */}
+        <div className="col-span-1 bg-gradient-to-br from-slate-700 to-slate-900 rounded-xl p-4 text-white shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-medium text-slate-300 uppercase tracking-wide">Solde caisse</p>
+            <div className="bg-white/10 p-1.5 rounded-lg">
+              <Wallet className="h-4 w-4 text-white" />
+            </div>
           </div>
-          <div className="overflow-hidden">
-            {recentSales.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">Aucune vente aujourd'hui</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Référence</TableHead>
-                    <TableHead>Montant</TableHead>
-                    <TableHead>Heure</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentSales.map((sale) => (
-                    <TableRow key={sale.id}>
-                      <TableCell className="font-mono text-xs">{sale.reference}</TableCell>
-                      <TableCell className="font-semibold text-emerald-600">
-                        {formatCurrency(sale.total_amount)}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {formatDateTime(sale.created_at)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+          <p className="text-2xl font-bold leading-tight">
+            {formatCurrency(stats?.cash_balance ?? 0)}
+          </p>
+          <p className="text-xs text-slate-400 mt-1">Solde journal</p>
+        </div>
+      </div>
+
+      {/* 2 petites cartes indicateurs */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Ventes du jour */}
+        <div
+          className="bg-white rounded-xl border shadow-sm p-4 flex items-center gap-3 cursor-pointer hover:bg-muted/30 transition-colors"
+          onClick={() => navigate('/sales')}
+        >
+          <div className="bg-blue-50 p-2.5 rounded-lg">
+            <ShoppingCart className="h-5 w-5 text-blue-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-foreground">{stats?.sales_count_today ?? 0}</p>
+            <p className="text-xs text-muted-foreground">Ventes aujourd'hui</p>
           </div>
         </div>
 
-        {/* Low stock */}
-        <div className="bg-white rounded-lg border shadow-sm">
-          <div className="px-5 py-4 border-b flex items-center justify-between">
-            <h2 className="font-semibold text-sm">Alertes stock faible</h2>
-            <a href="/stocks" className="text-xs text-primary hover:underline">Gérer</a>
+        {/* Ruptures */}
+        <div
+          className={`rounded-xl border shadow-sm p-4 flex items-center gap-3 cursor-pointer transition-colors ${
+            (stats?.low_stock_count ?? 0) > 0
+              ? 'bg-orange-50 border-orange-200 hover:bg-orange-100'
+              : 'bg-white hover:bg-muted/30'
+          }`}
+          onClick={() => navigate('/stocks')}
+        >
+          <div className={`p-2.5 rounded-lg ${(stats?.low_stock_count ?? 0) > 0 ? 'bg-orange-100' : 'bg-slate-50'}`}>
+            <AlertTriangle className={`h-5 w-5 ${(stats?.low_stock_count ?? 0) > 0 ? 'text-orange-500' : 'text-slate-400'}`} />
           </div>
-          <div className="overflow-hidden">
-            {lowStockProducts.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">✓ Tous les stocks sont suffisants</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Produit</TableHead>
-                    <TableHead className="text-right">Stock</TableHead>
-                    <TableHead className="text-right">Min</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {lowStockProducts.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium text-sm">{p.name}</p>
-                          <p className="text-xs text-muted-foreground font-mono">{p.reference}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant={p.stock_current === 0 ? 'danger' : 'warning'}>
-                          {p.stock_current}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right text-xs text-muted-foreground">
-                        {p.stock_minimum}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+          <div>
+            <p className={`text-2xl font-bold ${(stats?.low_stock_count ?? 0) > 0 ? 'text-orange-600' : 'text-foreground'}`}>
+              {stats?.low_stock_count ?? 0}
+            </p>
+            <p className="text-xs text-muted-foreground">Ruptures stock</p>
           </div>
         </div>
       </div>
+
+      {/* Dernières ventes */}
+      <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+        <div className="px-4 py-3 border-b flex items-center justify-between">
+          <h2 className="font-semibold text-sm">Dernières ventes</h2>
+          <button
+            onClick={() => navigate('/sales')}
+            className="flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            Voir tout <ArrowRight className="h-3 w-3" />
+          </button>
+        </div>
+        {recentSales.length === 0 ? (
+          <div className="text-center py-8">
+            <ShoppingCart className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">Aucune vente aujourd'hui</p>
+          </div>
+        ) : (
+          <div className="divide-y">
+            {recentSales.map((sale) => {
+              const mainItem = sale.sale_items?.[0]
+              const itemCount = sale.sale_items?.length ?? 0
+              return (
+                <div key={sale.id} className="px-4 py-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {mainItem?.product?.name ?? 'Vente'}
+                      {itemCount > 1 && (
+                        <span className="text-xs text-muted-foreground ml-1">+{itemCount - 1} article(s)</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(sale.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <p className="font-bold text-emerald-600 text-sm">
+                    {formatCurrency(sale.total_amount)}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Alertes stock faible */}
+      <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+        <div className="px-4 py-3 border-b flex items-center justify-between">
+          <h2 className="font-semibold text-sm">Alertes stock faible</h2>
+          <button
+            onClick={() => navigate('/stocks')}
+            className="flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            Gérer <ArrowRight className="h-3 w-3" />
+          </button>
+        </div>
+        {lowStockProducts.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground">✓ Tous les stocks sont suffisants</p>
+          </div>
+        ) : (
+          <div className="divide-y">
+            {lowStockProducts.map((p) => (
+              <div key={p.id} className="px-4 py-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">{p.name}</p>
+                  <p className="text-xs text-muted-foreground font-mono">{p.reference}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant={p.stock_current === 0 ? 'danger' : 'warning'}>
+                    {p.stock_current}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">/ {p.stock_minimum}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
     </div>
   )
 }
