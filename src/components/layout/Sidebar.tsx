@@ -1,16 +1,18 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Package, Warehouse, ShoppingCart,
-  BookOpen, Receipt, LogOut
+  BookOpen, Receipt, LogOut, Users, Truck
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 
 const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Tableau de bord', exact: true },
+  { to: '/', icon: LayoutDashboard, label: 'Tableau de bord', exact: true, adminOnly: false },
   { to: '/products', icon: Package, label: 'Produits', adminOnly: false },
   { to: '/stocks', icon: Warehouse, label: 'Stocks', adminOnly: false },
   { to: '/sales', icon: ShoppingCart, label: 'Ventes', adminOnly: false },
+  { to: '/clients', icon: Users, label: 'Clients', adminOnly: false },
+  { to: '/fournisseurs', icon: Truck, label: 'Fournisseurs', adminOnly: false },
   { to: '/journal', icon: BookOpen, label: 'Livre Journal', adminOnly: false },
   { to: '/expenses', icon: Receipt, label: 'Dépenses', adminOnly: true },
 ]
@@ -49,7 +51,7 @@ export function Sidebar({ onSignOut }: SidebarProps) {
         </div>
       </div>
 
-      <nav className="flex-1 px-2 py-4 space-y-0.5">
+      <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
         {visibleItems.map((item) => {
           const isActive = item.exact
             ? location.pathname === item.to
