@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { saleService } from '@/services/saleService'
-import type { Sale, CreateSalePayload } from '@/types'
+import type { Sale, CreateSalePayload, PaymentMethod } from '@/types'
 import { useToast } from '@/store/toastStore'
 import { useAuthStore } from '@/store/authStore'
 
@@ -32,5 +32,26 @@ export function useSales() {
     return sale
   }
 
-  return { sales, isLoading, reload: load, createSale }
+  // NOUVEAU : annuler une vente
+  const deleteSale = async (id: string) => {
+    await saleService.delete(id)
+    setSales((prev) => prev.filter((s) => s.id !== id))
+  }
+
+  // NOUVEAU : modifier mode de paiement et notes
+  const updateSale = async (
+    id: string,
+    updates: { payment_method?: PaymentMethod; notes?: string }
+  ) => {
+    const { error } = await (await import('@/lib/supabase')).supabase
+      .from('sales')
+      .update(updates)
+      .eq('id', id)
+    if (error) throw error
+    setSales((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, ...updates } : s))
+    )
+  }
+
+  return { sales, isLoading, reload: load, createSale, deleteSale, updateSale }
 }
