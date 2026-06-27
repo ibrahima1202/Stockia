@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Minus, Trash2, ShoppingCart, Receipt, Pencil, XCircle } from 'lucide-react'
+import { Plus, Minus, Trash2, ShoppingCart, Receipt, Pencil, XCircle, User } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   Badge, EmptyState, Card
@@ -8,17 +8,22 @@ import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { useSales } from '@/hooks/useSales'
 import { useProducts } from '@/hooks/useProducts'
+import { useClients } from '@/hooks/useClients'
 import { formatCurrency, formatDateTime, formatPaymentMethod } from '@/lib/utils'
-import type { Sale, SaleCartItem, PaymentMethod } from '@/types'
+import type { Sale, SaleCartItem, PaymentMethod, SaleStatut } from '@/types'
 import { useToast } from '@/store/toastStore'
 
 export default function SalesPage() {
   const { sales, isLoading, createSale, deleteSale, updateSale } = useSales()
   const { products } = useProducts()
+  const { clients } = useClients()
   const toast = useToast()
 
   const [cart, setCart] = useState<SaleCartItem[]>([])
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('especes')
+  const [statut, setStatut] = useState<SaleStatut>('paye')
+  const [montantPaye, setMontantPaye] = useState('')
+  const [selectedClientId, setSelectedClientId] = useState('')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [activeTab, setActiveTab] = useState<'list' | 'new'>('list')
@@ -40,6 +45,12 @@ export default function SalesPage() {
   )
 
   const cartTotal = cart.reduce((sum, item) => sum + item.total_price, 0)
+
+  const montantDu = statut === 'credit'
+    ? cartTotal
+    : statut === 'partiel'
+    ? cartTotal - (parseFloat(montantPaye) || 0)
+    : 0
 
   const addToCart = () => {
     const product = products.find((p) => p.id === selectedProductId)
@@ -92,12 +103,34 @@ export default function SalesPage() {
 
   const handleSubmitSale = async () => {
     if (cart.length === 0) return
+    if ((statut === 'credit' || statut === 'partiel') && !selectedClientId) {
+      toast.error('Client requis', 'Sélectionnez un client pour une vente à crédit')
+      return
+    }
+    if (statut === 'partiel' && (!montantPaye || parseFloat(montantPaye) <= 0)) {
+      toast.error('Montant requis', 'Saisissez le montant payé')
+      return
+    }
     setSubmitting(true)
     try {
-      await createSale({ items: cart, payment_method: paymentMethod, notes })
+      await createSale({
+        items: cart,
+        payment_method: paymentMethod,
+        notes,
+        client_id: selectedClientId || null,
+        statut,
+        montant_paye: statut === 'paye'
+          ? cartTotal
+          : statut === 'partiel'
+          ? parseFloat(montantPaye)
+          : 0,
+      })
       setCart([])
       setNotes('')
       setPaymentMethod('especes')
+      setStatut('paye')
+      setMontantPaye('')
+      setSelectedClientId('')
       setActiveTab('list')
     } finally {
       setSubmitting(false)
@@ -138,6 +171,12 @@ export default function SalesPage() {
     } finally {
       setEditSubmitting(false)
     }
+  }
+
+  const getStatutBadge = (sale: Sale) => {
+    if (sale.statut === 'credit') return <Badge variant="danger">À crédit</Badge>
+    if (sale.statut === 'partiel') return <Badge variant="warning">Partiel</Badge>
+    return <Badge variant="success">Payé</Badge>
   }
 
   if (isLoading) return <LoadingScreen text="Chargement des ventes..." />
@@ -183,9 +222,8 @@ export default function SalesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Référence</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Articles</TableHead>
-                  <TableHead>Paiement</TableHead>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Statut</TableHead>
                   <TableHead className="text-right">Montant</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -193,18 +231,35 @@ export default function SalesPage() {
               <TableBody>
                 {sales.map((sale) => (
                   <TableRow key={sale.id}>
-                    <TableCell className="font-mono text-xs">{sale.reference}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {formatDateTime(sale.created_at)}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {sale.sale_items?.length ?? 0} article(s)
+                    <TableCell>
+                      <p className="font-mono text-xs">{sale.reference}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDateTime(sale.created_at)}
+                      </p>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="info">{formatPaymentMethod(sale.payment_method)}</Badge>
+                      {sale.client ? (
+                        <div className="flex items-center gap-1">
+                          <User className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs font-medium">{sale.client.name}</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </TableCell>
-                    <TableCell className="text-right font-bold text-emerald-600">
-                      {formatCurrency(sale.total_amount)}
+                    <TableCell>{getStatutBadge(sale)}</TableCell>
+                    <TableCell className="text-right">
+                      <p className="font-bold text-emerald-600 text-sm">
+                        {formatCurrency(sale.total_amount)}
+                      </p>
+                      {sale.statut === 'partiel' && (
+                        <p className="text-xs text-red-500">
+                          Reste: {formatCurrency(sale.total_amount - (sale.montant_paye ?? 0))}
+                        </p>
+                      )}
+                      {sale.statut === 'credit' && (
+                        <p className="text-xs text-red-500">Non payé</p>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 justify-end">
@@ -239,7 +294,6 @@ export default function SalesPage() {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
             <h2 className="font-semibold text-lg">Modifier la vente</h2>
             <p className="text-sm text-muted-foreground font-mono">{editingSale.reference}</p>
-
             <div className="py-2 border rounded-md px-3 bg-muted/30">
               <p className="text-xs text-muted-foreground mb-1">Articles</p>
               {editingSale.sale_items?.map((item) => (
@@ -251,7 +305,6 @@ export default function SalesPage() {
                 Total : {formatCurrency(editingSale.total_amount)}
               </p>
             </div>
-
             <Select
               label="Mode de paiement"
               value={editPaymentMethod}
@@ -262,7 +315,6 @@ export default function SalesPage() {
                 { value: 'carte', label: 'Carte bancaire' },
               ]}
             />
-
             <div className="space-y-1.5">
               <label className="block text-sm font-medium">Notes</label>
               <textarea
@@ -272,20 +324,11 @@ export default function SalesPage() {
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               />
             </div>
-
             <div className="flex gap-2 pt-2">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setEditingSale(null)}
-              >
+              <Button variant="outline" className="flex-1" onClick={() => setEditingSale(null)}>
                 Annuler
               </Button>
-              <Button
-                className="flex-1"
-                onClick={handleUpdateSale}
-                isLoading={editSubmitting}
-              >
+              <Button className="flex-1" onClick={handleUpdateSale} isLoading={editSubmitting}>
                 Enregistrer
               </Button>
             </div>
@@ -335,7 +378,7 @@ export default function SalesPage() {
                     <TableRow>
                       <TableHead>Produit</TableHead>
                       <TableHead className="text-right">Prix unit.</TableHead>
-                      <TableHead className="text-center">Quantité</TableHead>
+                      <TableHead className="text-center">Qté</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
@@ -385,20 +428,88 @@ export default function SalesPage() {
           <div className="space-y-4">
             <Card className="p-4 space-y-4">
               <h3 className="font-semibold">Récapitulatif</h3>
+
               <div className="flex items-center justify-between py-2 border-t border-b">
                 <span className="text-sm font-medium">Total</span>
                 <span className="text-xl font-bold text-emerald-600">{formatCurrency(cartTotal)}</span>
               </div>
+
+              {/* Client */}
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium">
+                  Client <span className="text-muted-foreground font-normal">(optionnel)</span>
+                </label>
+                <select
+                  value={selectedClientId}
+                  onChange={(e) => setSelectedClientId(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="">Aucun client</option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Statut paiement */}
               <Select
-                label="Mode de paiement"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                label="Statut du paiement"
+                value={statut}
+                onChange={(e) => {
+                  setStatut(e.target.value as SaleStatut)
+                  if (e.target.value === 'paye') setSelectedClientId('')
+                }}
                 options={[
-                  { value: 'especes', label: 'Espèces' },
-                  { value: 'mobile_money', label: 'Mobile Money' },
-                  { value: 'carte', label: 'Carte bancaire' },
+                  { value: 'paye', label: '✅ Payé intégralement' },
+                  { value: 'credit', label: '🔴 À crédit (non payé)' },
+                  { value: 'partiel', label: '🟡 Paiement partiel' },
                 ]}
               />
+
+              {/* Montant payé si partiel */}
+              {statut === 'partiel' && (
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium">Montant payé (XOF)</label>
+                  <input
+                    type="number"
+                    value={montantPaye}
+                    onChange={(e) => setMontantPaye(e.target.value)}
+                    max={cartTotal}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    placeholder="0"
+                  />
+                  {parseFloat(montantPaye) > 0 && (
+                    <p className="text-xs text-red-500">
+                      Reste dû : {formatCurrency(cartTotal - parseFloat(montantPaye))}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Résumé crédit */}
+              {(statut === 'credit' || statut === 'partiel') && selectedClientId && montantDu > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                  <p className="text-xs text-red-600 font-medium">
+                    {formatCurrency(montantDu)} sera ajouté au crédit de{' '}
+                    {clients.find((c) => c.id === selectedClientId)?.name}
+                  </p>
+                </div>
+              )}
+
+              {/* Mode de paiement (si pas 100% crédit) */}
+              {statut !== 'credit' && (
+                <Select
+                  label="Mode de paiement"
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                  options={[
+                    { value: 'especes', label: 'Espèces' },
+                    { value: 'mobile_money', label: 'Mobile Money' },
+                    { value: 'carte', label: 'Carte bancaire' },
+                  ]}
+                />
+              )}
+
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium">Notes (optionnel)</label>
                 <textarea
@@ -408,6 +519,7 @@ export default function SalesPage() {
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
               </div>
+
               <Button
                 className="w-full"
                 onClick={handleSubmitSale}
