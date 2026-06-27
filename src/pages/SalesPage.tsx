@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Minus, Trash2, ShoppingCart, Receipt } from 'lucide-react'
+import { Plus, Minus, Trash2, ShoppingCart, Receipt, Pencil, XCircle } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   Badge, EmptyState, Card
@@ -9,11 +9,11 @@ import { Select } from '@/components/ui/select'
 import { useSales } from '@/hooks/useSales'
 import { useProducts } from '@/hooks/useProducts'
 import { formatCurrency, formatDateTime, formatPaymentMethod } from '@/lib/utils'
-import type { SaleCartItem, PaymentMethod } from '@/types'
+import type { Sale, SaleCartItem, PaymentMethod } from '@/types'
 import { useToast } from '@/store/toastStore'
 
 export default function SalesPage() {
-  const { sales, isLoading, createSale } = useSales()
+  const { sales, isLoading, createSale, deleteSale, updateSale } = useSales()
   const { products } = useProducts()
   const toast = useToast()
 
@@ -24,6 +24,15 @@ export default function SalesPage() {
   const [activeTab, setActiveTab] = useState<'list' | 'new'>('list')
   const [selectedProductId, setSelectedProductId] = useState('')
   const [qty, setQty] = useState(1)
+
+  // Annulation
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
+
+  // Modification
+  const [editingSale, setEditingSale] = useState<Sale | null>(null)
+  const [editPaymentMethod, setEditPaymentMethod] = useState<PaymentMethod>('especes')
+  const [editNotes, setEditNotes] = useState('')
+  const [editSubmitting, setEditSubmitting] = useState(false)
 
   const activeProducts = useMemo(
     () => products.filter((p) => p.is_active && p.stock_current > 0),
@@ -95,6 +104,42 @@ export default function SalesPage() {
     }
   }
 
+  const handleCancelSale = async (id: string) => {
+    if (!window.confirm('Confirmer l\'annulation de cette vente ? Le stock sera restitué.')) return
+    setCancellingId(id)
+    try {
+      await deleteSale(id)
+      toast.success('Vente annulée', 'Le stock a été restitué automatiquement')
+    } catch {
+      toast.error('Erreur', 'Impossible d\'annuler cette vente')
+    } finally {
+      setCancellingId(null)
+    }
+  }
+
+  const openEditModal = (sale: Sale) => {
+    setEditingSale(sale)
+    setEditPaymentMethod(sale.payment_method as PaymentMethod)
+    setEditNotes(sale.notes ?? '')
+  }
+
+  const handleUpdateSale = async () => {
+    if (!editingSale) return
+    setEditSubmitting(true)
+    try {
+      await updateSale(editingSale.id, {
+        payment_method: editPaymentMethod,
+        notes: editNotes,
+      })
+      toast.success('Vente modifiée', 'Les informations ont été mises à jour')
+      setEditingSale(null)
+    } catch {
+      toast.error('Erreur', 'Impossible de modifier cette vente')
+    } finally {
+      setEditSubmitting(false)
+    }
+  }
+
   if (isLoading) return <LoadingScreen text="Chargement des ventes..." />
 
   return (
@@ -142,6 +187,7 @@ export default function SalesPage() {
                   <TableHead>Articles</TableHead>
                   <TableHead>Paiement</TableHead>
                   <TableHead className="text-right">Montant</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -160,11 +206,90 @@ export default function SalesPage() {
                     <TableCell className="text-right font-bold text-emerald-600">
                       {formatCurrency(sale.total_amount)}
                     </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1 justify-end">
+                        <button
+                          onClick={() => openEditModal(sale)}
+                          className="p-1.5 hover:bg-blue-50 rounded text-blue-500"
+                          title="Modifier"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleCancelSale(sale.id)}
+                          disabled={cancellingId === sale.id}
+                          className="p-1.5 hover:bg-red-50 rounded text-red-400"
+                          title="Annuler"
+                        >
+                          <XCircle className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
+        </div>
+      )}
+
+      {/* Modal modification */}
+      {editingSale && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+            <h2 className="font-semibold text-lg">Modifier la vente</h2>
+            <p className="text-sm text-muted-foreground font-mono">{editingSale.reference}</p>
+
+            <div className="py-2 border rounded-md px-3 bg-muted/30">
+              <p className="text-xs text-muted-foreground mb-1">Articles</p>
+              {editingSale.sale_items?.map((item) => (
+                <p key={item.id} className="text-sm">
+                  {item.product?.name} × {item.quantity} — {formatCurrency(item.total_price)}
+                </p>
+              ))}
+              <p className="text-sm font-bold text-emerald-600 mt-1 pt-1 border-t">
+                Total : {formatCurrency(editingSale.total_amount)}
+              </p>
+            </div>
+
+            <Select
+              label="Mode de paiement"
+              value={editPaymentMethod}
+              onChange={(e) => setEditPaymentMethod(e.target.value as PaymentMethod)}
+              options={[
+                { value: 'especes', label: 'Espèces' },
+                { value: 'mobile_money', label: 'Mobile Money' },
+                { value: 'carte', label: 'Carte bancaire' },
+              ]}
+            />
+
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium">Notes</label>
+              <textarea
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                rows={2}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setEditingSale(null)}
+              >
+                Annuler
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleUpdateSale}
+                isLoading={editSubmitting}
+              >
+                Enregistrer
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -306,4 +431,4 @@ export default function SalesPage() {
       )}
     </div>
   )
-}
+        }
