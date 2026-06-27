@@ -9,7 +9,7 @@ import { Select } from '@/components/ui/select'
 import { useSales } from '@/hooks/useSales'
 import { useProducts } from '@/hooks/useProducts'
 import { useClients } from '@/hooks/useClients'
-import { formatCurrency, formatDateTime, formatPaymentMethod } from '@/lib/utils'
+import { formatCurrency, formatDateTime } from '@/lib/utils'
 import type { Sale, SaleCartItem, PaymentMethod, SaleStatut } from '@/types'
 import { useToast } from '@/store/toastStore'
 
