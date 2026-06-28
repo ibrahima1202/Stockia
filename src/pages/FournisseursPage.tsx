@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Plus, Phone, MapPin, Wallet, XCircle, Pencil, ShoppingBag } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Plus, Phone, MapPin, Wallet, XCircle, Pencil, ShoppingBag, Minus, Trash2 } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   Badge, EmptyState, Card
@@ -7,17 +7,21 @@ import {
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { useFournisseurs } from '@/hooks/useFournisseurs'
+import { useProducts } from '@/hooks/useProducts'
+import { useCategories } from '@/hooks/useProducts'
 import { formatCurrency } from '@/lib/utils'
-import type { Fournisseur, PaymentMethod } from '@/types'
+import type { Fournisseur, PaymentMethod, AchatCartItem, AchatStatut, Product } from '@/types'
 
 export default function FournisseursPage() {
   const {
     fournisseurs, isLoading,
     createFournisseur, updateFournisseur, deleteFournisseur,
-    addAchat, addReglement
+    createProduct, addAchat, addReglement
   } = useFournisseurs()
+  const { products, reload: reloadProducts } = useProducts()
+  const { categories } = useCategories()
 
-  // Modal création/édition
+  // Modal création/édition fournisseur
   const [showForm, setShowForm] = useState(false)
   const [editingFourn, setEditingFourn] = useState<Fournisseur | null>(null)
   const [formData, setFormData] = useState({ name: '', phone: '', address: '', notes: '' })
@@ -25,9 +29,22 @@ export default function FournisseursPage() {
 
   // Modal achat
   const [achatFourn, setAchatFourn] = useState<Fournisseur | null>(null)
-  const [achatMontant, setAchatMontant] = useState('')
+  const [achatCart, setAchatCart] = useState<AchatCartItem[]>([])
+  const [achatStatut, setAchatStatut] = useState<AchatStatut>('comptant')
+  const [achatMontantPaye, setAchatMontantPaye] = useState('')
+  const [achatPaymentMethod, setAchatPaymentMethod] = useState<PaymentMethod>('especes')
   const [achatNotes, setAchatNotes] = useState('')
   const [achatSubmitting, setAchatSubmitting] = useState(false)
+  const [selectedProductId, setSelectedProductId] = useState('')
+  const [achatQty, setAchatQty] = useState(1)
+  const [achatUnitPrice, setAchatUnitPrice] = useState('')
+
+  // Modal création rapide produit
+  const [showNewProduct, setShowNewProduct] = useState(false)
+  const [newProductData, setNewProductData] = useState({
+    name: '', reference: '', category_id: '', purchase_price: '', selling_price: ''
+  })
+  const [newProductSubmitting, setNewProductSubmitting] = useState(false)
 
   // Modal règlement
   const [reglementFourn, setReglementFourn] = useState<Fournisseur | null>(null)
@@ -35,6 +52,18 @@ export default function FournisseursPage() {
   const [reglementMethod, setReglementMethod] = useState<PaymentMethod>('especes')
   const [reglementNotes, setReglementNotes] = useState('')
   const [reglementSubmitting, setReglementSubmitting] = useState(false)
+
+  const achatTotal = achatCart.reduce((sum, i) => sum + i.total_price, 0)
+  const montantDu = achatStatut === 'credit'
+    ? achatTotal
+    : achatStatut === 'partiel'
+    ? achatTotal - (parseFloat(achatMontantPaye) || 0)
+    : 0
+
+  const activeProducts = useMemo(
+    () => products.filter((p) => p.is_active),
+    [products]
+  )
 
   const openCreate = () => {
     setEditingFourn(null)
@@ -44,12 +73,7 @@ export default function FournisseursPage() {
 
   const openEdit = (fourn: Fournisseur) => {
     setEditingFourn(fourn)
-    setFormData({
-      name: fourn.name,
-      phone: fourn.phone ?? '',
-      address: fourn.address ?? '',
-      notes: fourn.notes ?? '',
-    })
+    setFormData({ name: fourn.name, phone: fourn.phone ?? '', address: fourn.address ?? '', notes: fourn.notes ?? '' })
     setShowForm(true)
   }
 
@@ -74,17 +98,96 @@ export default function FournisseursPage() {
     await deleteFournisseur(id)
   }
 
+  const openAchat = (fourn: Fournisseur) => {
+    setAchatFourn(fourn)
+    setAchatCart([])
+    setAchatStatut('comptant')
+    setAchatMontantPaye('')
+    setAchatPaymentMethod('especes')
+    setAchatNotes('')
+    setSelectedProductId('')
+    setAchatQty(1)
+    setAchatUnitPrice('')
+  }
+
+  const addToAchatCart = () => {
+    const product = products.find((p) => p.id === selectedProductId)
+    if (!product || !achatUnitPrice || achatQty < 1) return
+    const unitPrice = parseFloat(achatUnitPrice)
+    setAchatCart((prev) => {
+      const existing = prev.find((i) => i.product.id === product.id)
+      if (existing) {
+        return prev.map((i) =>
+          i.product.id === product.id
+            ? { ...i, quantity: i.quantity + achatQty, total_price: (i.quantity + achatQty) * i.unit_price }
+            : i
+        )
+      }
+      return [...prev, { product, quantity: achatQty, unit_price: unitPrice, total_price: achatQty * unitPrice }]
+    })
+    setSelectedProductId('')
+    setAchatQty(1)
+    setAchatUnitPrice('')
+  }
+
+  const removeFromAchatCart = (productId: string) => {
+    setAchatCart((prev) => prev.filter((i) => i.product.id !== productId))
+  }
+
+  const updateAchatQty = (productId: string, newQty: number) => {
+    if (newQty <= 0) {
+      removeFromAchatCart(productId)
+      return
+    }
+    setAchatCart((prev) =>
+      prev.map((i) =>
+        i.product.id === productId
+          ? { ...i, quantity: newQty, total_price: newQty * i.unit_price }
+          : i
+      )
+    )
+  }
+
   const handleAchat = async () => {
-    if (!achatFourn || !achatMontant) return
+    if (!achatFourn || achatCart.length === 0) return
+    if (achatStatut === 'partiel' && (!achatMontantPaye || parseFloat(achatMontantPaye) <= 0)) return
     setAchatSubmitting(true)
     try {
-      await addAchat(achatFourn.id, parseFloat(achatMontant), achatNotes)
+      await addAchat({
+        fournisseur_id: achatFourn.id,
+        items: achatCart,
+        statut: achatStatut,
+        montant_paye: achatStatut === 'comptant' ? achatTotal : parseFloat(achatMontantPaye) || 0,
+        payment_method: achatPaymentMethod,
+        notes: achatNotes,
+      })
       setAchatFourn(null)
-      setAchatMontant('')
-      setAchatNotes('')
+      reloadProducts()
     } catch {
     } finally {
       setAchatSubmitting(false)
+    }
+  }
+
+  const handleCreateProduct = async () => {
+    if (!newProductData.name || !newProductData.reference) return
+    setNewProductSubmitting(true)
+    try {
+      const product = await createProduct({
+        name: newProductData.name,
+        reference: newProductData.reference,
+        category_id: newProductData.category_id || undefined,
+        purchase_price: parseFloat(newProductData.purchase_price) || 0,
+        selling_price: parseFloat(newProductData.selling_price) || 0,
+      })
+      await reloadProducts()
+      setSelectedProductId(product.id)
+      setAchatUnitPrice(newProductData.purchase_price)
+      setShowNewProduct(false)
+      setNewProductData({ name: '', reference: '', category_id: '', purchase_price: '', selling_price: '' })
+    } catch {
+    } finally {
+      setNewProductSubmitting(false)
     }
   }
 
@@ -92,12 +195,7 @@ export default function FournisseursPage() {
     if (!reglementFourn || !reglementMontant) return
     setReglementSubmitting(true)
     try {
-      await addReglement(
-        reglementFourn.id,
-        parseFloat(reglementMontant),
-        reglementMethod,
-        reglementNotes
-      )
+      await addReglement(reglementFourn.id, parseFloat(reglementMontant), reglementMethod, reglementNotes)
       setReglementFourn(null)
       setReglementMontant('')
       setReglementNotes('')
@@ -119,14 +217,14 @@ export default function FournisseursPage() {
           <p className="text-sm text-muted-foreground">{fournisseurs.length} fournisseur(s)</p>
         </div>
         <Button onClick={openCreate}>
-          <Plus className="h-4 w-4" /> Nouveau fournisseur
+          <Plus className="h-4 w-4" /> Nouveau
         </Button>
       </div>
 
       {/* Résumé */}
       <div className="grid grid-cols-2 gap-4">
         <Card className="p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total fournisseurs</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Fournisseurs</p>
           <p className="text-2xl font-bold mt-1">{fournisseurs.length}</p>
         </Card>
         <Card className="p-4">
@@ -144,7 +242,6 @@ export default function FournisseursPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Fournisseur</TableHead>
-                <TableHead>Contact</TableHead>
                 <TableHead className="text-right">Dette</TableHead>
                 <TableHead></TableHead>
               </TableRow>
@@ -154,19 +251,15 @@ export default function FournisseursPage() {
                 <TableRow key={fourn.id}>
                   <TableCell>
                     <p className="font-medium text-sm">{fourn.name}</p>
+                    {fourn.phone && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Phone className="h-3 w-3" />{fourn.phone}
+                      </p>
+                    )}
                     {fourn.address && (
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <MapPin className="h-3 w-3" />{fourn.address}
                       </p>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {fourn.phone ? (
-                      <p className="text-sm flex items-center gap-1">
-                        <Phone className="h-3 w-3" />{fourn.phone}
-                      </p>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">—</span>
                     )}
                   </TableCell>
                   <TableCell className="text-right">
@@ -179,7 +272,7 @@ export default function FournisseursPage() {
                   <TableCell>
                     <div className="flex items-center gap-1 justify-end">
                       <button
-                        onClick={() => setAchatFourn(fourn)}
+                        onClick={() => openAchat(fourn)}
                         className="p-1.5 hover:bg-orange-50 rounded text-orange-500"
                         title="Nouvel achat"
                       >
@@ -189,23 +282,15 @@ export default function FournisseursPage() {
                         <button
                           onClick={() => setReglementFourn(fourn)}
                           className="p-1.5 hover:bg-green-50 rounded text-green-600"
-                          title="Enregistrer un paiement"
+                          title="Payer"
                         >
                           <Wallet className="h-3.5 w-3.5" />
                         </button>
                       )}
-                      <button
-                        onClick={() => openEdit(fourn)}
-                        className="p-1.5 hover:bg-blue-50 rounded text-blue-500"
-                        title="Modifier"
-                      >
+                      <button onClick={() => openEdit(fourn)} className="p-1.5 hover:bg-blue-50 rounded text-blue-500">
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
-                      <button
-                        onClick={() => handleDelete(fourn.id)}
-                        className="p-1.5 hover:bg-red-50 rounded text-red-400"
-                        title="Supprimer"
-                      >
+                      <button onClick={() => handleDelete(fourn.id)} className="p-1.5 hover:bg-red-50 rounded text-red-400">
                         <XCircle className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -217,58 +302,28 @@ export default function FournisseursPage() {
         )}
       </div>
 
-      {/* Modal création/édition */}
+      {/* Modal création/édition fournisseur */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
-            <h2 className="font-semibold text-lg">
-              {editingFourn ? 'Modifier le fournisseur' : 'Nouveau fournisseur'}
-            </h2>
+            <h2 className="font-semibold text-lg">{editingFourn ? 'Modifier' : 'Nouveau fournisseur'}</h2>
             <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium mb-1">Nom *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  placeholder="Nom du fournisseur"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Téléphone</label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  placeholder="+223 XX XX XX XX"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Adresse</label>
-                <input
-                  type="text"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  placeholder="Quartier, ville..."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Notes</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  rows={2}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
-              </div>
+              {['name', 'phone', 'address', 'notes'].map((field) => (
+                <div key={field}>
+                  <label className="block text-sm font-medium mb-1 capitalize">
+                    {field === 'name' ? 'Nom *' : field === 'phone' ? 'Téléphone' : field === 'address' ? 'Adresse' : 'Notes'}
+                  </label>
+                  <input
+                    type="text"
+                    value={formData[field as keyof typeof formData]}
+                    onChange={(e) => setFormData({ ...formData, [field]: e.target.value })}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                </div>
+              ))}
             </div>
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowForm(false)}>
-                Annuler
-              </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setShowForm(false)}>Annuler</Button>
               <Button className="flex-1" onClick={handleSubmitForm} isLoading={formSubmitting}>
                 {editingFourn ? 'Enregistrer' : 'Ajouter'}
               </Button>
@@ -279,43 +334,261 @@ export default function FournisseursPage() {
 
       {/* Modal achat */}
       {achatFourn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
-            <h2 className="font-semibold text-lg">Nouvel achat</h2>
-            <p className="text-sm text-muted-foreground">{achatFourn.name}</p>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium mb-1">Montant total (XOF) *</label>
-                <input
-                  type="number"
-                  value={achatMontant}
-                  onChange={(e) => setAchatMontant(e.target.value)}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  placeholder="0"
-                />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-2">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 space-y-4">
+            <h2 className="font-semibold text-lg">Facture d'achat — {achatFourn.name}</h2>
+
+            {/* Sélection produit */}
+            <Card className="p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Ajouter un produit</p>
+                <button
+                  onClick={() => setShowNewProduct(true)}
+                  className="text-xs text-primary flex items-center gap-1 hover:underline"
+                >
+                  <Plus className="h-3 w-3" /> Nouveau produit
+                </button>
               </div>
+              <select
+                value={selectedProductId}
+                onChange={(e) => {
+                  setSelectedProductId(e.target.value)
+                  const p = products.find((x) => x.id === e.target.value)
+                  if (p) setAchatUnitPrice(p.purchase_price.toString())
+                }}
+                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Sélectionner un produit...</option>
+                {activeProducts.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name} (stock: {p.stock_current})</option>
+                ))}
+              </select>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-xs text-muted-foreground">Prix achat (XOF)</label>
+                  <input
+                    type="number"
+                    value={achatUnitPrice}
+                    onChange={(e) => setAchatUnitPrice(e.target.value)}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    placeholder="0"
+                  />
+                </div>
+                <div className="w-20">
+                  <label className="text-xs text-muted-foreground">Qté</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={achatQty}
+                    onChange={(e) => setAchatQty(parseInt(e.target.value) || 1)}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-center"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button onClick={addToAchatCart} disabled={!selectedProductId || !achatUnitPrice}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+            {/* Panier achat */}
+            {achatCart.length > 0 && (
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Produit</TableHead>
+                      <TableHead className="text-center">Qté</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {achatCart.map((item) => (
+                      <TableRow key={item.product.id}>
+                        <TableCell>
+                          <p className="text-sm font-medium">{item.product.name}</p>
+                          <p className="text-xs text-muted-foreground">{formatCurrency(item.unit_price)}/u</p>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => updateAchatQty(item.product.id, item.quantity - 1)}
+                              className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="w-8 text-center text-sm">{item.quantity}</span>
+                            <button
+                              onClick={() => updateAchatQty(item.product.id, item.quantity + 1)}
+                              className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-sm">
+                          {formatCurrency(item.total_price)}
+                        </TableCell>
+                        <TableCell>
+                          <button onClick={() => removeFromAchatCart(item.product.id)} className="p-1 hover:bg-red-50 rounded">
+                            <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                          </button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <div className="px-4 py-2 bg-muted/30 flex justify-between items-center">
+                  <span className="text-sm font-medium">Total facture</span>
+                  <span className="font-bold text-lg">{formatCurrency(achatTotal)}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Paiement */}
+            <div className="space-y-3">
+              <Select
+                label="Mode de règlement"
+                value={achatStatut}
+                onChange={(e) => setAchatStatut(e.target.value as AchatStatut)}
+                options={[
+                  { value: 'comptant', label: '✅ Comptant (payé intégralement)' },
+                  { value: 'credit', label: '🔴 À crédit (non payé)' },
+                  { value: 'partiel', label: '🟡 Paiement partiel' },
+                ]}
+              />
+
+              {achatStatut === 'partiel' && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Montant payé (XOF)</label>
+                  <input
+                    type="number"
+                    value={achatMontantPaye}
+                    onChange={(e) => setAchatMontantPaye(e.target.value)}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    placeholder="0"
+                  />
+                  {parseFloat(achatMontantPaye) > 0 && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Reste dû : {formatCurrency(achatTotal - parseFloat(achatMontantPaye))}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {achatStatut !== 'credit' && (
+                <Select
+                  label="Mode de paiement"
+                  value={achatPaymentMethod}
+                  onChange={(e) => setAchatPaymentMethod(e.target.value as PaymentMethod)}
+                  options={[
+                    { value: 'especes', label: 'Espèces' },
+                    { value: 'mobile_money', label: 'Mobile Money' },
+                    { value: 'carte', label: 'Carte bancaire' },
+                  ]}
+                />
+              )}
+
+              {montantDu > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                  <p className="text-xs text-red-600 font-medium">
+                    {formatCurrency(montantDu)} sera ajouté à la dette envers {achatFourn.name}
+                  </p>
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
+                <label className="block text-sm font-medium mb-1">Notes</label>
                 <textarea
                   value={achatNotes}
                   onChange={(e) => setAchatNotes(e.target.value)}
                   rows={2}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  placeholder="Liste des produits achetés..."
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 />
               </div>
             </div>
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setAchatFourn(null)}>
-                Annuler
-              </Button>
+
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setAchatFourn(null)}>Annuler</Button>
               <Button
                 className="flex-1"
                 onClick={handleAchat}
                 isLoading={achatSubmitting}
-                disabled={!achatMontant}
+                disabled={achatCart.length === 0}
               >
-                Enregistrer
+                Valider la facture
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal création rapide produit */}
+      {showNewProduct && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+            <h2 className="font-semibold text-lg">Nouveau produit</h2>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Nom *</label>
+                <input
+                  type="text"
+                  value={newProductData.name}
+                  onChange={(e) => setNewProductData({ ...newProductData, name: e.target.value })}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Référence *</label>
+                <input
+                  type="text"
+                  value={newProductData.reference}
+                  onChange={(e) => setNewProductData({ ...newProductData, reference: e.target.value })}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Catégorie</label>
+                <select
+                  value={newProductData.category_id}
+                  onChange={(e) => setNewProductData({ ...newProductData, category_id: e.target.value })}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="">Sans catégorie</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Prix achat</label>
+                  <input
+                    type="number"
+                    value={newProductData.purchase_price}
+                    onChange={(e) => setNewProductData({ ...newProductData, purchase_price: e.target.value })}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Prix vente</label>
+                  <input
+                    type="number"
+                    value={newProductData.selling_price}
+                    onChange={(e) => setNewProductData({ ...newProductData, selling_price: e.target.value })}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setShowNewProduct(false)}>Annuler</Button>
+              <Button className="flex-1" onClick={handleCreateProduct} isLoading={newProductSubmitting}>
+                Créer
               </Button>
             </div>
           </div>
@@ -337,7 +610,7 @@ export default function FournisseursPage() {
                   type="number"
                   value={reglementMontant}
                   onChange={(e) => setReglementMontant(e.target.value)}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
                   placeholder="0"
                 />
               </div>
@@ -357,20 +630,13 @@ export default function FournisseursPage() {
                   value={reglementNotes}
                   onChange={(e) => setReglementNotes(e.target.value)}
                   rows={2}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 />
               </div>
             </div>
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setReglementFourn(null)}>
-                Annuler
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={handleReglement}
-                isLoading={reglementSubmitting}
-                disabled={!reglementMontant}
-              >
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setReglementFourn(null)}>Annuler</Button>
+              <Button className="flex-1" onClick={handleReglement} isLoading={reglementSubmitting} disabled={!reglementMontant}>
                 Payer
               </Button>
             </div>
