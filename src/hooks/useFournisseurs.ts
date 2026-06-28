@@ -55,7 +55,7 @@ export function useFournisseurs() {
     product: { name: string; reference: string; category_id?: string; purchase_price: number; selling_price: number }
   ): Promise<Product> => {
     if (!user) throw new Error('Non authentifié')
-    return await fournisseurService.createProduct(product, user.id)
+   return await fournisseurService.createProduct(product)
   }
 
   // NOUVEAU : achat avec plusieurs produits
