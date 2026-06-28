@@ -130,16 +130,51 @@ export interface ReglementClient {
 // ============================================================
 // FOURNISSEUR
 // ============================================================
-export interface Fournisseur {
+export interface AchatItem {
   id: string
-  name: string
-  phone?: string
-  address?: string
+  achat_id: string
+  product_id: string
+  quantity: number
+  unit_price: number
+  total_price: number
+  created_at: string
+  // Joined
+  product?: Product
+}
+
+export type AchatStatut = 'comptant' | 'credit' | 'partiel'
+
+export interface AchatFournisseur {
+  id: string
+  fournisseur_id: string
+  reference: string
+  montant_total: number
+  montant_paye: number
+  statut: AchatStatut
+  payment_method?: PaymentMethod
   notes?: string
-  solde: number
+  achat_date: string
   created_by?: string
   created_at: string
-  updated_at: string
+  // Joined
+  fournisseur?: Fournisseur
+  achat_items?: AchatItem[]
+}
+
+export interface AchatCartItem {
+  product: Product
+  quantity: number
+  unit_price: number
+  total_price: number
+}
+
+export interface CreateAchatPayload {
+  fournisseur_id: string
+  items: AchatCartItem[]
+  statut: AchatStatut
+  montant_paye?: number
+  payment_method?: PaymentMethod
+  notes?: string
 }
 
 export interface AchatFournisseur {
