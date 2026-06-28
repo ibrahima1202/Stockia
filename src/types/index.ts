@@ -26,7 +26,6 @@ export interface Product {
   is_active: boolean
   created_at: string
   updated_at: string
-  // Joined
   category?: Category
 }
 export type StockMovementType = 'entree' | 'sortie'
@@ -39,7 +38,6 @@ export interface StockMovement {
   reference?: string
   created_by?: string
   created_at: string
-  // Joined
   product?: Product
   profile?: Profile
 }
@@ -56,7 +54,6 @@ export interface Sale {
   statut?: SaleStatut
   created_by?: string
   created_at: string
-  // Joined
   sale_items?: SaleItem[]
   profile?: Profile
   client?: Client
@@ -69,7 +66,6 @@ export interface SaleItem {
   unit_price: number
   total_price: number
   created_at: string
-  // Joined
   product?: Product
 }
 export type ExpenseCategory = 'transport' | 'loyer' | 'divers'
@@ -81,7 +77,6 @@ export interface Expense {
   expense_date: string
   created_by?: string
   created_at: string
-  // Joined
   profile?: Profile
 }
 export type JournalSourceType = 'vente' | 'depense' | 'manuel' | 'reglement_client' | 'reglement_fournisseur' | 'achat_fournisseur'
@@ -112,7 +107,6 @@ export interface Client {
   created_at: string
   updated_at: string
 }
-
 export interface ReglementClient {
   id: string
   client_id: string
@@ -123,74 +117,23 @@ export interface ReglementClient {
   reglement_date: string
   created_by?: string
   created_at: string
-  // Joined
   client?: Client
 }
 
 // ============================================================
 // FOURNISSEUR
 // ============================================================
-export interface AchatItem {
+export interface Fournisseur {
   id: string
-  achat_id: string
-  product_id: string
-  quantity: number
-  unit_price: number
-  total_price: number
-  created_at: string
-  // Joined
-  product?: Product
-}
-
-export type AchatStatut = 'comptant' | 'credit' | 'partiel'
-
-export interface AchatFournisseur {
-  id: string
-  fournisseur_id: string
-  reference: string
-  montant_total: number
-  montant_paye: number
-  statut: AchatStatut
-  payment_method?: PaymentMethod
+  name: string
+  phone?: string
+  address?: string
   notes?: string
-  achat_date: string
+  solde: number
   created_by?: string
   created_at: string
-  // Joined
-  fournisseur?: Fournisseur
-  achat_items?: AchatItem[]
+  updated_at: string
 }
-
-export interface AchatCartItem {
-  product: Product
-  quantity: number
-  unit_price: number
-  total_price: number
-}
-
-export interface CreateAchatPayload {
-  fournisseur_id: string
-  items: AchatCartItem[]
-  statut: AchatStatut
-  montant_paye?: number
-  payment_method?: PaymentMethod
-  notes?: string
-}
-
-export interface AchatFournisseur {
-  id: string
-  fournisseur_id: string
-  reference: string
-  montant_total: number
-  montant_paye: number
-  notes?: string
-  achat_date: string
-  created_by?: string
-  created_at: string
-  // Joined
-  fournisseur?: Fournisseur
-}
-
 export interface ReglementFournisseur {
   id: string
   fournisseur_id: string
@@ -200,8 +143,47 @@ export interface ReglementFournisseur {
   reglement_date: string
   created_by?: string
   created_at: string
-  // Joined
   fournisseur?: Fournisseur
+}
+export interface AchatItem {
+  id: string
+  achat_id: string
+  product_id: string
+  quantity: number
+  unit_price: number
+  total_price: number
+  created_at: string
+  product?: Product
+}
+export type AchatStatut = 'comptant' | 'credit' | 'partiel'
+export interface AchatFournisseur {
+  id: string
+  fournisseur_id: string
+  reference: string
+  montant_total: number
+  montant_paye: number
+  statut: AchatStatut
+  payment_method?: PaymentMethod
+  notes?: string
+  achat_date: string
+  created_by?: string
+  created_at: string
+  fournisseur?: Fournisseur
+  achat_items?: AchatItem[]
+}
+export interface AchatCartItem {
+  product: Product
+  quantity: number
+  unit_price: number
+  total_price: number
+}
+export interface CreateAchatPayload {
+  fournisseur_id: string
+  items: AchatCartItem[]
+  statut: AchatStatut
+  montant_paye?: number
+  payment_method?: PaymentMethod
+  notes?: string
 }
 
 // ============================================================
