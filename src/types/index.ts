@@ -213,3 +213,63 @@ export interface CreateSalePayload {
   montant_paye?: number
   statut?: SaleStatut
 }
+// ============================================================
+// ABONNEMENTS & PLANS
+// ============================================================
+export interface Plan {
+  id: string
+  name: string
+  slug: 'starter' | 'business' | 'pro'
+  price: number
+  max_products: number | null
+  max_users: number | null
+  features: string[]
+  is_active: boolean
+  created_at: string
+}
+
+export type SubscriptionStatus = 'trial' | 'active' | 'expired' | 'cancelled'
+
+export interface Subscription {
+  id: string
+  owner_id: string
+  plan_id: string
+  status: SubscriptionStatus
+  trial_ends_at: string
+  current_period_start: string
+  current_period_end: string
+  created_at: string
+  updated_at: string
+  // Joined
+  plan?: Plan
+}
+
+export interface Business {
+  id: string
+  owner_id: string
+  name: string
+  phone?: string
+  address?: string
+  city?: string
+  country: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Payment {
+  id: string
+  subscription_id: string
+  amount: number
+  payment_method: 'wave' | 'orange_money' | 'especes'
+  status: 'pending' | 'completed' | 'failed'
+  reference?: string
+  paid_at?: string
+  created_at: string
+}
+
+export interface CreateBusinessPayload {
+  name: string
+  phone?: string
+  address?: string
+  city?: string
+}
