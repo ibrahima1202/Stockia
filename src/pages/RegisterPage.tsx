@@ -4,6 +4,7 @@ import { Building2, User, Phone, MapPin, Check } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useSubscription } from '@/hooks/useSubscription'
 import { formatCurrency } from '@/lib/utils'
+import type { Plan } from '@/types'
 
 const STEPS = ['Compte', 'Commerce', 'Plan']
 
