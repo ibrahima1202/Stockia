@@ -62,3 +62,24 @@ export function useProducts() {
     deleteProduct,
   }
 }
+
+// Hook séparé pour les catégories uniquement
+export function useCategories() {
+  const [categories, setCategories] = useState<Category[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      const cats = await productService.getCategories()
+      setCategories(cats)
+    } catch {
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  return { categories, isLoading, reload: load }
+}
