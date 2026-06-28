@@ -10,7 +10,7 @@ import { useFournisseurs } from '@/hooks/useFournisseurs'
 import { useProducts } from '@/hooks/useProducts'
 import { useCategories } from '@/hooks/useProducts'
 import { formatCurrency } from '@/lib/utils'
-import type { Fournisseur, PaymentMethod, AchatCartItem, AchatStatut, Product } from '@/types'
+import type { Fournisseur, PaymentMethod, AchatCartItem, AchatStatut } from '@/types'
 
 export default function FournisseursPage() {
   const {
