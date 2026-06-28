@@ -3,9 +3,8 @@ import { useNavigate, Link } from 'react-router-dom'
 import { Building2, User, Phone, MapPin, Check } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useSubscription } from '@/hooks/useSubscription'
-import { formatCurrency } from '@/lib/utils'
 
-const STEPS = ['Compte', 'Commerce', 'Plan']
+const STEPS = ['Compte', 'Commerce']
 
 export default function RegisterPage() {
   const navigate = useNavigate()
@@ -26,10 +25,7 @@ export default function RegisterPage() {
   const [businessPhone, setBusinessPhone] = useState('')
   const [businessCity, setBusinessCity] = useState('')
 
-  // Étape 3 — Plan
-  const [selectedPlanId, setSelectedPlanId] = useState('')
-
-  const handleStep1 = async () => {
+  const handleStep1 = () => {
     if (!fullName || !email || !password) {
       setError('Tous les champs obligatoires doivent être remplis')
       return
@@ -46,22 +42,13 @@ export default function RegisterPage() {
     setStep(1)
   }
 
-  const handleStep2 = () => {
+  const handleStep2 = async () => {
     if (!businessName) {
       setError('Le nom du commerce est obligatoire')
       return
     }
     setError('')
-    setStep(2)
-  }
-
-  const handleSubmit = async () => {
-    if (!selectedPlanId) {
-      setError('Veuillez choisir un plan')
-      return
-    }
     setIsLoading(true)
-    setError('')
     try {
       // 1. Créer le compte Supabase
       const { data, error: authError } = await supabase.auth.signUp({
@@ -74,10 +61,13 @@ export default function RegisterPage() {
       if (authError) throw authError
       if (!data.user) throw new Error('Erreur lors de la création du compte')
 
-      // 2. Créer le commerce + abonnement
+      // 2. Créer le commerce avec plan Business par défaut (essai 14 jours)
+      const businessPlan = plans.find((p) => p.slug === 'business')
+      if (!businessPlan) throw new Error('Plan introuvable')
+
       await createBusiness(
         { name: businessName, phone: businessPhone, city: businessCity },
-        selectedPlanId
+        businessPlan.id
       )
 
       navigate('/')
@@ -91,6 +81,7 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center px-4 py-8">
+
       {/* Logo */}
       <div className="flex items-center gap-3 mb-8">
         <svg viewBox="0 0 44 44" width="44" height="44" xmlns="http://www.w3.org/2000/svg">
@@ -115,7 +106,7 @@ export default function RegisterPage() {
 
         {/* Progress steps */}
         <div className="bg-slate-50 px-6 py-4 border-b">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-center gap-4">
             {STEPS.map((s, i) => (
               <div key={s} className="flex items-center gap-2">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
@@ -125,11 +116,11 @@ export default function RegisterPage() {
                 }`}>
                   {i < step ? <Check className="h-4 w-4" /> : i + 1}
                 </div>
-                <span className={`text-sm font-medium hidden sm:block ${
+                <span className={`text-sm font-medium ${
                   i === step ? 'text-orange-500' : 'text-slate-400'
                 }`}>{s}</span>
                 {i < STEPS.length - 1 && (
-                  <div className={`h-0.5 w-8 mx-1 ${i < step ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+                  <div className={`h-0.5 w-12 ml-2 ${i < step ? 'bg-emerald-500' : 'bg-slate-200'}`} />
                 )}
               </div>
             ))}
@@ -197,6 +188,12 @@ export default function RegisterPage() {
               >
                 Continuer →
               </button>
+              <p className="text-center text-sm text-slate-500">
+                Déjà un compte ?{' '}
+                <Link to="/login" className="text-orange-500 font-medium hover:underline">
+                  Se connecter
+                </Link>
+              </p>
             </>
           )}
 
@@ -243,7 +240,7 @@ export default function RegisterPage() {
                       value={businessCity}
                       onChange={(e) => setBusinessCity(e.target.value)}
                       className="w-full h-9 rounded-md border border-input bg-background pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      placeholder="Kadiolo, Sikasso, Bamako..."
+                      placeholder="Bamako, Sikasso, Tombouctou..."
                     />
                   </div>
                 </div>
@@ -251,102 +248,31 @@ export default function RegisterPage() {
               {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">{error}</p>}
               <div className="flex gap-2">
                 <button
-                  onClick={() => setStep(0)}
+                  onClick={() => { setStep(0); setError('') }}
                   className="flex-1 h-10 border border-slate-200 text-slate-600 rounded-md text-sm font-medium hover:bg-slate-50 transition-colors"
                 >
                   ← Retour
                 </button>
                 <button
                   onClick={handleStep2}
-                  className="flex-1 h-10 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-sm font-semibold transition-colors"
-                >
-                  Continuer →
-                </button>
-              </div>
-            </>
-          )}
-
-          {/* Étape 3 — Plan */}
-          {step === 2 && (
-            <>
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">Choisissez votre plan</h2>
-                <p className="text-sm text-slate-500 mt-0.5">14 jours gratuits sur tous les plans</p>
-              </div>
-              <div className="space-y-3">
-                {plans.map((plan) => (
-                  <div
-                    key={plan.id}
-                    onClick={() => setSelectedPlanId(plan.id)}
-                    className={`border-2 rounded-xl p-4 cursor-pointer transition-all ${
-                      selectedPlanId === plan.id
-                        ? 'border-orange-500 bg-orange-50'
-                        : 'border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                          selectedPlanId === plan.id ? 'border-orange-500 bg-orange-500' : 'border-slate-300'
-                        }`}>
-                          {selectedPlanId === plan.id && <Check className="h-3 w-3 text-white" />}
-                        </div>
-                        <span className="font-bold text-slate-900">{plan.name}</span>
-                        {plan.slug === 'business' && (
-                          <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium">
-                            Populaire
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <span className="font-bold text-slate-900">{formatCurrency(plan.price)}</span>
-                        <span className="text-xs text-slate-400">/mois</span>
-                      </div>
-                    </div>
-                    <ul className="space-y-1">
-                      {(plan.features as string[]).map((feature, i) => (
-                        <li key={i} className="text-xs text-slate-600 flex items-center gap-1.5">
-                          <Check className="h-3 w-3 text-emerald-500 shrink-0" />
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-              {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">{error}</p>}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setStep(1)}
-                  className="flex-1 h-10 border border-slate-200 text-slate-600 rounded-md text-sm font-medium hover:bg-slate-50 transition-colors"
-                >
-                  ← Retour
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={isLoading || !selectedPlanId}
+                  disabled={isLoading}
                   className="flex-1 h-10 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded-md text-sm font-semibold transition-colors"
                 >
                   {isLoading ? 'Création...' : 'Commencer l\'essai gratuit 🚀'}
                 </button>
               </div>
               <p className="text-xs text-center text-slate-400">
-                Aucune carte bancaire requise • Annulable à tout moment
+                Aucune carte bancaire requise • 14 jours gratuits
               </p>
             </>
           )}
 
-          {/* Lien connexion */}
-          {step === 0 && (
-            <p className="text-center text-sm text-slate-500">
-              Déjà un compte ?{' '}
-              <Link to="/login" className="text-orange-500 font-medium hover:underline">
-                Se connecter
-              </Link>
-            </p>
-          )}
         </div>
       </div>
+
+      <p className="text-center text-slate-600 text-xs mt-6">
+        © {new Date().getFullYear()} STOCKAM · Tous droits réservés
+      </p>
     </div>
   )
 }
