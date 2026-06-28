@@ -58,10 +58,9 @@ export const fournisseurService = {
   // ============================================================
   // CRÉATION RAPIDE DE PRODUIT
   // ============================================================
-  async createProduct(
-    product: { name: string; reference: string; category_id?: string; purchase_price: number; selling_price: number },
-    userId: string
-  ): Promise<Product> {
+ async createProduct(
+  product: { name: string; reference: string; category_id?: string; purchase_price: number; selling_price: number }
+): Promise<Product> {
     const { data, error } = await supabase
       .from('products')
       .insert({
