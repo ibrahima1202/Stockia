@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { fournisseurService } from '@/services/fournisseurService'
-import type { Fournisseur, AchatFournisseur, ReglementFournisseur, PaymentMethod } from '@/types'
+import type { Fournisseur, AchatFournisseur, ReglementFournisseur, PaymentMethod, CreateAchatPayload, Product } from '@/types'
 import { useToast } from '@/store/toastStore'
 import { useAuthStore } from '@/store/authStore'
 
@@ -50,23 +50,29 @@ export function useFournisseurs() {
     toast.success('Fournisseur supprimé')
   }
 
-  const addAchat = async (
-    fournisseurId: string,
-    montantTotal: number,
-    notes: string
-  ): Promise<AchatFournisseur> => {
+  // NOUVEAU : création rapide de produit depuis achat
+  const createProduct = async (
+    product: { name: string; reference: string; category_id?: string; purchase_price: number; selling_price: number }
+  ): Promise<Product> => {
     if (!user) throw new Error('Non authentifié')
-    const achat = await fournisseurService.addAchat(
-      fournisseurId, montantTotal, notes, user.id
-    )
-    setFournisseurs((prev) =>
-      prev.map((f) =>
-        f.id === fournisseurId
-          ? { ...f, solde: f.solde + montantTotal }
-          : f
+    return await fournisseurService.createProduct(product, user.id)
+  }
+
+  // NOUVEAU : achat avec plusieurs produits
+  const addAchat = async (payload: CreateAchatPayload): Promise<AchatFournisseur> => {
+    if (!user) throw new Error('Non authentifié')
+    const achat = await fournisseurService.addAchat(payload, user.id)
+    const montantDu = achat.montant_total - achat.montant_paye
+    if (montantDu > 0) {
+      setFournisseurs((prev) =>
+        prev.map((f) =>
+          f.id === payload.fournisseur_id
+            ? { ...f, solde: f.solde + montantDu }
+            : f
+        )
       )
-    )
-    toast.success('Achat enregistré', `${montantTotal.toLocaleString()} XOF`)
+    }
+    toast.success('Achat enregistré', `Stock mis à jour automatiquement`)
     return achat
   }
 
@@ -98,6 +104,7 @@ export function useFournisseurs() {
     createFournisseur,
     updateFournisseur,
     deleteFournisseur,
+    createProduct,
     addAchat,
     addReglement,
   }
