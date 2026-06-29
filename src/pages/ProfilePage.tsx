@@ -57,7 +57,7 @@ export default function ProfilePage() {
     setPasswordSubmitting(true)
     try {
       await profileService.updatePassword(newPassword)
-      setCurrentPassword('')
+     
       setNewPassword('')
       setConfirmPassword('')
       toast.success('Mot de passe modifié')
