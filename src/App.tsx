@@ -11,6 +11,7 @@ import JournalPage from '@/pages/JournalPage'
 import ExpensesPage from '@/pages/ExpensesPage'
 import ClientsPage from '@/pages/ClientsPage'
 import FournisseursPage from '@/pages/FournisseursPage'
+import ProfilePage from '@/pages/ProfilePage'
 
 export default function App() {
   return (
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="journal" element={<JournalPage />} />
           <Route path="clients" element={<ClientsPage />} />
           <Route path="fournisseurs" element={<FournisseursPage />} />
+          <Route path="profile" element={<ProfilePage />} />
           <Route
             path="expenses"
             element={
