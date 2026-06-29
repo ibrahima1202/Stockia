@@ -19,7 +19,7 @@ export default function ProfilePage() {
   const [profileSubmitting, setProfileSubmitting] = useState(false)
   const [cleanConfirm, setCleanConfirm] = useState(false)
   const [cleanSubmitting, setCleanSubmitting] = useState(false)
-  const [planSubmitting, setPlanSubmitting] = useState(false)
+
 
   const handleUpdateProfile = async () => {
     if (!user || !fullName.trim()) return
@@ -52,18 +52,6 @@ export default function ProfilePage() {
     }
   }
 
-  const handleChangePlan = async (planId: string) => {
-    if (!subscription) return
-    setPlanSubmitting(true)
-    try {
-      await subscriptionService.updateSubscriptionPlan(subscription.id, planId)
-      await reload()
-      toast.success('Plan mis à jour')
-    } catch {
-      toast.error('Erreur', 'Impossible de changer de plan')
-    } finally {
-      setPlanSubmitting(false)
-    }
   }
 
   const daysLeft = subscription ? subscriptionService.getDaysLeftInTrial(subscription) : 0
