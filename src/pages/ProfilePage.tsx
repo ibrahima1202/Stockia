@@ -18,11 +18,6 @@ export default function ProfilePage() {
   const [fullName, setFullName] = useState(profile?.full_name ?? '')
   const [profileSubmitting, setProfileSubmitting] = useState(false)
 
-  // Mot de passe
-
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [passwordSubmitting, setPasswordSubmitting] = useState(false)
 
   // Nettoyage
   const [cleanConfirm, setCleanConfirm] = useState(false)
@@ -239,40 +234,7 @@ export default function ProfilePage() {
           </div>
         </Card>
       )}
-
-      {/* Mot de passe */}
-      <Card className="p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <Lock className="h-4 w-4 text-slate-500" />
-          <h2 className="font-semibold text-sm">Modifier le mot de passe</h2>
-        </div>
-        <div className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium mb-1">Nouveau mot de passe</label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              placeholder="Min. 6 caractères"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Confirmer le mot de passe</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              placeholder="Répétez le mot de passe"
-            />
-          </div>
-        </div>
-        <Button onClick={handleUpdatePassword} isLoading={passwordSubmitting} size="sm">
-          Modifier le mot de passe
-        </Button>
-      </Card>
-
+ç)
       {/* Nettoyage des données */}
       <Card className="p-4 space-y-3 border-red-200">
         <div className="flex items-center gap-2">
