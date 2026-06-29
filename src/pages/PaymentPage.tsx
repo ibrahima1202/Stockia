@@ -14,7 +14,7 @@ const RECIPIENT_NAME = 'Ibrahima Sidibé'
 export default function PaymentPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { plans, subscription, reload } = useSubscription()
+  const { plans, subscription } = useSubscription()
   const toast = useToast()
 
   const planId = searchParams.get('plan')
