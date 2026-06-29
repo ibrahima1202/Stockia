@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { User, Building2, Lock, Trash2, Crown, Calendar } from 'lucide-react'
+import { User, Building2, Trash2, Crown, Calendar } from 'lucide-react'
 import { Card } from '@/components/ui/index'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/store/authStore'
@@ -14,16 +14,10 @@ export default function ProfilePage() {
   const { subscription, business, plans, reload } = useSubscription()
   const toast = useToast()
 
-  // Profil
   const [fullName, setFullName] = useState(profile?.full_name ?? '')
   const [profileSubmitting, setProfileSubmitting] = useState(false)
-
-
-  // Nettoyage
   const [cleanConfirm, setCleanConfirm] = useState(false)
   const [cleanSubmitting, setCleanSubmitting] = useState(false)
-
-  // Plan
   const [planSubmitting, setPlanSubmitting] = useState(false)
 
   const handleUpdateProfile = async () => {
@@ -37,29 +31,6 @@ export default function ProfilePage() {
       toast.error('Erreur', 'Impossible de mettre à jour le profil')
     } finally {
       setProfileSubmitting(false)
-    }
-  }
-
-  const handleUpdatePassword = async () => {
-    if (!newPassword || newPassword !== confirmPassword) {
-      toast.error('Erreur', 'Les mots de passe ne correspondent pas')
-      return
-    }
-    if (newPassword.length < 6) {
-      toast.error('Erreur', 'Le mot de passe doit contenir au moins 6 caractères')
-      return
-    }
-    setPasswordSubmitting(true)
-    try {
-      await profileService.updatePassword(newPassword)
-     
-      setNewPassword('')
-      setConfirmPassword('')
-      toast.success('Mot de passe modifié')
-    } catch {
-      toast.error('Erreur', 'Impossible de modifier le mot de passe')
-    } finally {
-      setPasswordSubmitting(false)
     }
   }
 
@@ -101,7 +72,7 @@ export default function ProfilePage() {
     <div className="space-y-5">
       <div>
         <h1 className="page-title">Mon profil</h1>
-        <p className="text-sm text-muted-foreground">Gérez vos informations personnelles et votre abonnement</p>
+        <p className="text-sm text-muted-foreground">Informations personnelles et abonnement</p>
       </div>
 
       {/* Abonnement */}
@@ -117,7 +88,7 @@ export default function ProfilePage() {
               ⏳ Essai gratuit — {daysLeft} jour(s) restant(s)
             </p>
             <p className="text-xs text-orange-600 mt-0.5">
-              Choisissez un plan avant la fin de votre essai pour continuer à utiliser STOCKAM.
+              Choisissez un plan avant la fin de votre essai.
             </p>
           </div>
         )}
@@ -144,7 +115,6 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Changer de plan */}
         <div className="space-y-2">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Changer de plan</p>
           {plans.map((plan) => (
@@ -161,12 +131,7 @@ export default function ProfilePage() {
               {subscription?.plan_id === plan.id ? (
                 <span className="text-xs text-orange-500 font-medium">Plan actuel</span>
               ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleChangePlan(plan.id)}
-                  isLoading={planSubmitting}
-                >
+                <Button size="sm" variant="outline" onClick={() => handleChangePlan(plan.id)} isLoading={planSubmitting}>
                   Choisir
                 </Button>
               )}
@@ -234,7 +199,7 @@ export default function ProfilePage() {
           </div>
         </Card>
       )}
-ç)
+
       {/* Nettoyage des données */}
       <Card className="p-4 space-y-3 border-red-200">
         <div className="flex items-center gap-2">
@@ -242,32 +207,20 @@ export default function ProfilePage() {
           <h2 className="font-semibold text-sm text-red-600">Nettoyer les données de test</h2>
         </div>
         <p className="text-xs text-muted-foreground">
-          Supprime toutes les ventes, dépenses, mouvements de stock, clients et fournisseurs.
-          Les produits et catégories sont conservés. Les stocks sont remis à zéro.
+          Supprime ventes, dépenses, mouvements, clients et fournisseurs. Produits conservés. Stocks remis à zéro.
         </p>
         {cleanConfirm && (
           <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-            <p className="text-sm text-red-600 font-medium">
-              ⚠️ Êtes-vous sûr ? Cette action est irréversible !
-            </p>
+            <p className="text-sm text-red-600 font-medium">⚠️ Êtes-vous sûr ? Action irréversible !</p>
           </div>
         )}
         <div className="flex gap-2">
           {cleanConfirm && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCleanConfirm(false)}
-            >
+            <Button variant="outline" size="sm" onClick={() => setCleanConfirm(false)}>
               Annuler
             </Button>
           )}
-          <Button
-            size="sm"
-            className="bg-red-500 hover:bg-red-600 text-white"
-            onClick={handleCleanData}
-            isLoading={cleanSubmitting}
-          >
+          <Button size="sm" className="bg-red-500 hover:bg-red-600 text-white" onClick={handleCleanData} isLoading={cleanSubmitting}>
             {cleanConfirm ? 'Confirmer la suppression' : 'Nettoyer les données'}
           </Button>
         </div>
