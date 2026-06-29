@@ -8,12 +8,13 @@ import { profileService } from '@/services/profileService'
 import { subscriptionService } from '@/services/subscriptionService'
 import { formatCurrency } from '@/lib/utils'
 import { useToast } from '@/store/toastStore'
+import { useNavigate } from 'react-router-dom'
 
 export default function ProfilePage() {
   const { user, profile, setProfile } = useAuthStore()
   const { subscription, business, plans, reload } = useSubscription()
   const toast = useToast()
-
+  const navigate = useNavigate()
   const [fullName, setFullName] = useState(profile?.full_name ?? '')
   const [profileSubmitting, setProfileSubmitting] = useState(false)
   const [cleanConfirm, setCleanConfirm] = useState(false)
@@ -131,9 +132,13 @@ export default function ProfilePage() {
               {subscription?.plan_id === plan.id ? (
                 <span className="text-xs text-orange-500 font-medium">Plan actuel</span>
               ) : (
-                <Button size="sm" variant="outline" onClick={() => handleChangePlan(plan.id)} isLoading={planSubmitting}>
-                  Choisir
-                </Button>
+                <Button
+                  size="sm"
+                 variant="outline"
+               onClick={() => navigate(`/payment?plan=${plan.id}`)}
+            >
+             Choisir
+           </Button>
               )}
             </div>
           ))}
