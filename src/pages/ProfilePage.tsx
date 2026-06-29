@@ -20,7 +20,6 @@ export default function ProfilePage() {
   const [cleanConfirm, setCleanConfirm] = useState(false)
   const [cleanSubmitting, setCleanSubmitting] = useState(false)
 
-
   const handleUpdateProfile = async () => {
     if (!user || !fullName.trim()) return
     setProfileSubmitting(true)
@@ -44,17 +43,18 @@ export default function ProfilePage() {
     try {
       await profileService.cleanDemoData()
       toast.success('Données nettoyées', 'Les données de test ont été supprimées')
-      setCleanConfirm(false)
+      reload() // ✅ Rafraîchit l'état après nettoyage
     } catch {
       toast.error('Erreur', 'Impossible de nettoyer les données')
     } finally {
       setCleanSubmitting(false)
+      setCleanConfirm(false) // ✅ Réinitialise dans tous les cas (succès ou erreur)
     }
-
   }
 
-  const daysLeft = subscription ? subscriptionService.getDaysLeftInTrial(subscription) : 0
+  // ✅ Guard : isTrialing vérifié avant d'accéder à trial_ends_at
   const isTrialing = subscription?.status === 'trial'
+  const daysLeft = isTrialing ? subscriptionService.getDaysLeftInTrial(subscription!) : 0
 
   return (
     <div className="space-y-5">
@@ -121,11 +121,11 @@ export default function ProfilePage() {
               ) : (
                 <Button
                   size="sm"
-                 variant="outline"
-               onClick={() => navigate(`/payment?plan=${plan.id}`)}
-            >
-             Choisir
-           </Button>
+                  variant="outline"
+                  onClick={() => navigate(`/payment?plan=${plan.id}`)}
+                >
+                  Choisir
+                </Button>
               )}
             </div>
           ))}
@@ -212,7 +212,12 @@ export default function ProfilePage() {
               Annuler
             </Button>
           )}
-          <Button size="sm" className="bg-red-500 hover:bg-red-600 text-white" onClick={handleCleanData} isLoading={cleanSubmitting}>
+          <Button
+            size="sm"
+            className="bg-red-500 hover:bg-red-600 text-white"
+            onClick={handleCleanData}
+            isLoading={cleanSubmitting}
+          >
             {cleanConfirm ? 'Confirmer la suppression' : 'Nettoyer les données'}
           </Button>
         </div>
