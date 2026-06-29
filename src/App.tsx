@@ -12,6 +12,7 @@ import ExpensesPage from '@/pages/ExpensesPage'
 import ClientsPage from '@/pages/ClientsPage'
 import FournisseursPage from '@/pages/FournisseursPage'
 import ProfilePage from '@/pages/ProfilePage'
+import PaymentPage from '@/pages/PaymentPage'
 
 export default function App() {
   return (
@@ -19,6 +20,11 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/payment" element={
+          <ProtectedRoute>
+            <PaymentPage />
+          </ProtectedRoute>
+        } />
         <Route
           element={
             <ProtectedRoute>
