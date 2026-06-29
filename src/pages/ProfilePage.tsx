@@ -50,7 +50,6 @@ export default function ProfilePage() {
     } finally {
       setCleanSubmitting(false)
     }
-  }
 
   }
 
