@@ -1,5 +1,5 @@
-import { Outlet, NavLink, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Package, Warehouse, ShoppingCart, MoreHorizontal, BookOpen, Users, Truck, Receipt, X } from 'lucide-react'
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { LayoutDashboard, Package, Warehouse, ShoppingCart, MoreHorizontal, BookOpen, Users, Truck, Receipt, X, User, LogOut, Settings } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { ToastContainer } from '@/components/ui/toast'
 import { useAuth } from '@/hooks/useAuth'
@@ -25,7 +25,9 @@ export function AppLayout() {
   const { signOut } = useAuth()
   const { profile } = useAuthStore()
   const location = useLocation()
+  const navigate = useNavigate()
   const [showMore, setShowMore] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
 
   const isMoreActive = moreNavItems.some((item) =>
     location.pathname.startsWith(item.to)
@@ -56,7 +58,12 @@ export function AppLayout() {
               <p className="text-slate-400 text-xs">Gestion de stock</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 bg-slate-800 rounded-full px-3 py-1.5">
+
+          {/* Bouton utilisateur cliquable */}
+          <button
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            className="flex items-center gap-2 bg-slate-800 rounded-full px-3 py-1.5"
+          >
             <div className="w-6 h-6 rounded-full bg-slate-600 flex items-center justify-center">
               <span className="text-white text-xs font-bold">
                 {profile?.full_name?.charAt(0).toUpperCase() ?? 'U'}
@@ -65,11 +72,54 @@ export function AppLayout() {
             <span className="text-slate-200 text-xs font-medium">
               {profile?.full_name ?? 'Utilisateur'}
             </span>
-            <span className="text-slate-400 text-xs capitalize">
-              · {profile?.role ?? ''}
-            </span>
-          </div>
+          </button>
         </header>
+
+        {/* Menu utilisateur dropdown */}
+        {showUserMenu && (
+          <div
+            className="lg:hidden fixed inset-0 z-40 bg-black/50"
+            onClick={() => setShowUserMenu(false)}
+          >
+            <div
+              className="absolute top-14 right-4 bg-slate-900 border border-slate-700 rounded-xl shadow-xl w-52 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Infos utilisateur */}
+              <div className="px-4 py-3 border-b border-slate-700">
+                <p className="text-white text-sm font-medium">{profile?.full_name}</p>
+                <p className="text-slate-400 text-xs capitalize">{profile?.role}</p>
+              </div>
+
+              {/* Options */}
+              <div className="py-1">
+                <button
+                  onClick={() => { navigate('/profile'); setShowUserMenu(false) }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-200 hover:bg-slate-800 transition-colors text-sm"
+                >
+                  <User className="h-4 w-4 text-slate-400" />
+                  Mon profil
+                </button>
+                <button
+                  onClick={() => { navigate('/profile'); setShowUserMenu(false) }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-200 hover:bg-slate-800 transition-colors text-sm"
+                >
+                  <Settings className="h-4 w-4 text-slate-400" />
+                  Abonnement
+                </button>
+                <div className="border-t border-slate-700 mt-1 pt-1">
+                  <button
+                    onClick={() => { signOut(); setShowUserMenu(false) }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-red-400 hover:bg-slate-800 transition-colors text-sm"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Déconnexion
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Contenu principal */}
         <main className="flex-1 overflow-y-auto">
