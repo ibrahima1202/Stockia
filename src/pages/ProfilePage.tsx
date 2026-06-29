@@ -19,7 +19,7 @@ export default function ProfilePage() {
   const [profileSubmitting, setProfileSubmitting] = useState(false)
 
   // Mot de passe
-  const [currentPassword, setCurrentPassword] = useState('')
+
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordSubmitting, setPasswordSubmitting] = useState(false)
