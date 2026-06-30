@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { teamService } from '@/services/teamService'
+import { edgeFunctionService } from '@/services/edgeFunctionService'
 import type { Profile, UserRole } from '@/types'
 import { useToast } from '@/store/toastStore'
 import { useAuthStore } from '@/store/authStore'
@@ -42,5 +43,30 @@ export function useTeam() {
     return updated
   }
 
-  return { members, isLoading, reload: load, updateRole, toggleActive }
+  const createMember = async (data: {
+    email: string
+    password: string
+    fullName: string
+    role: UserRole
+  }) => {
+    if (!profile?.business_id) throw new Error('Commerce introuvable')
+
+    const result = await edgeFunctionService.createTeamMember({
+      email: data.email,
+      password: data.password,
+      fullName: data.fullName,
+      role: data.role,
+      businessId: profile.business_id,
+    })
+
+    if (!result.success) {
+      throw new Error(result.error ?? 'Erreur lors de la création')
+    }
+
+    toast.success('Membre ajouté', `${data.fullName} peut maintenant se connecter`)
+    await load()
+    return result
+  }
+
+  return { members, isLoading, reload: load, updateRole, toggleActive, createMember }
 }
