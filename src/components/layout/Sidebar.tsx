@@ -14,7 +14,6 @@ const navItems = [
   { to: '/clients', icon: Users, label: 'Clients', adminOnly: false },
   { to: '/fournisseurs', icon: Truck, label: 'Fournisseurs', adminOnly: false },
   { to: '/journal', icon: BookOpen, label: 'Livre Journal', adminOnly: false },
-  { to: '/team', icon: UsersRound, label: 'Mon équipe', adminOnly: true },
   { to: '/expenses', icon: Receipt, label: 'Dépenses', adminOnly: true },
 ]
 
