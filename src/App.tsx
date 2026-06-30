@@ -14,6 +14,7 @@ import FournisseursPage from '@/pages/FournisseursPage'
 import ProfilePage from '@/pages/ProfilePage'
 import PaymentPage from '@/pages/PaymentPage'
 import SubscriptionPage from '@/pages/SubscriptionPage'
+import StatsPage from '@/pages/StatsPage'
 
 export default function App() {
   return (
@@ -42,6 +43,7 @@ export default function App() {
           <Route path="fournisseurs" element={<FournisseursPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="subscription" element={<SubscriptionPage />} />
+          <Route path="stats" element={<StatsPage />} />
           <Route
             path="expenses"
             element={
