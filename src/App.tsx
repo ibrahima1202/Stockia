@@ -16,6 +16,7 @@ import PaymentPage from '@/pages/PaymentPage'
 import SubscriptionPage from '@/pages/SubscriptionPage'
 import StatsPage from '@/pages/StatsPage'
 import TeamPage from '@/pages/TeamPage'
+import AdminPage from '@/pages/AdminPage'
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
             </ProtectedRoute>
           }
         >
+          <Route path="/admin" element={<AdminPage />} />
           <Route index element={<DashboardPage />} />
           <Route path="products" element={<ProductsPage />} />
           <Route path="stocks" element={<StocksPage />} />
