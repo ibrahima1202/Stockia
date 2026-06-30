@@ -1,12 +1,15 @@
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, TrendingUp, Wallet, Package, Users, Truck, RefreshCw } from 'lucide-react'
+import { ArrowLeft, TrendingUp, Wallet, Package, Users, Truck, RefreshCw, Lock, Crown } from 'lucide-react'
 import { Card, LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, EmptyState } from '@/components/ui/index'
+import { Button } from '@/components/ui/button'
 import { useStats, type StatsPeriod } from '@/hooks/useStats'
+import { useSubscription } from '@/hooks/useSubscription'
 import { formatCurrency } from '@/lib/utils'
 import { BarChart3 } from 'lucide-react'
 
 export default function StatsPage() {
   const navigate = useNavigate()
+  const { canAccessStats, isLoading: subLoading } = useSubscription()
   const {
     period, setPeriod, customStart, setCustomStart, customEnd, setCustomEnd,
     periodStats, fondsRoulement, isLoading, reload
@@ -19,7 +22,60 @@ export default function StatsPage() {
     custom: 'Personnalisé',
   }
 
-  if (isLoading) return <LoadingScreen text="Calcul des statistiques..." />
+  if (isLoading || subLoading) return <LoadingScreen text="Calcul des statistiques..." />
+
+  // Blocage si pas plan Pro
+  if (!canAccessStats) {
+    return (
+      <div className="space-y-5">
+        <button
+          onClick={() => navigate('/')}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" /> Retour au tableau de bord
+        </button>
+
+        <div className="flex flex-col items-center justify-center py-16 space-y-5 text-center">
+          <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center">
+            <Lock className="h-10 w-10 text-orange-500" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">Fonctionnalité Pro</h1>
+            <p className="text-sm text-muted-foreground mt-2 max-w-sm">
+              Les statistiques avancées (fonds de roulement, bénéfices, résultat net) sont réservées au plan Pro.
+            </p>
+          </div>
+          <Card className="p-5 w-full max-w-sm text-left space-y-3">
+            <div className="flex items-center gap-2">
+              <Crown className="h-4 w-4 text-orange-500" />
+              <p className="font-semibold text-sm">Plan Pro — 15 000 XOF/mois</p>
+            </div>
+            <ul className="space-y-1.5">
+              {[
+                'Statistiques & Bénéfices',
+                'Fonds de roulement',
+                'Résultat net par période',
+                'Bénéfice par produit',
+                'Utilisateurs illimités',
+                'Export PDF',
+                'Support prioritaire',
+              ].map((f) => (
+                <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
+                  <span className="text-emerald-500">✓</span> {f}
+                </li>
+              ))}
+            </ul>
+            <Button
+              className="w-full"
+              onClick={() => navigate('/subscription')}
+            >
+              Passer au plan Pro
+            </Button>
+          </Card>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -88,12 +144,10 @@ export default function StatsPage() {
             <Wallet className="h-4 w-4 text-purple-500" />
             <h2 className="font-semibold text-sm">Fonds de roulement</h2>
           </div>
-
           <div className="bg-gradient-to-br from-purple-500 to-purple-700 rounded-xl p-4 text-white">
             <p className="text-xs text-purple-100 uppercase tracking-wide">Total disponible</p>
             <p className="text-3xl font-bold mt-1">{formatCurrency(fondsRoulement.total)}</p>
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div className="border rounded-lg p-3">
               <div className="flex items-center gap-1.5 mb-1">
@@ -134,7 +188,6 @@ export default function StatsPage() {
             <TrendingUp className="h-4 w-4 text-emerald-500" />
             <h2 className="font-semibold text-sm">Performance — {periodLabels[period]}</h2>
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-blue-50 rounded-lg p-3">
               <p className="text-xs text-blue-600 font-medium">CA généré</p>
@@ -153,7 +206,6 @@ export default function StatsPage() {
               <p className="text-lg font-bold text-red-700">{formatCurrency(periodStats.expenses)}</p>
             </div>
           </div>
-
           <div className={`rounded-lg p-3 ${periodStats.resultatNet >= 0 ? 'bg-emerald-100' : 'bg-red-100'}`}>
             <p className={`text-xs font-semibold ${periodStats.resultatNet >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
               Résultat net (bénéfice − dépenses)
@@ -162,7 +214,6 @@ export default function StatsPage() {
               {formatCurrency(periodStats.resultatNet)}
             </p>
           </div>
-
           <p className="text-xs text-muted-foreground">{periodStats.salesCount} vente(s) sur la période</p>
         </Card>
       )}
