@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Package, Warehouse, ShoppingCart,
-  BookOpen, Receipt, LogOut, Users, Truck, UserCircle, UsersRound
+  BookOpen, Receipt, LogOut, Users, Truck, UserCircle
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
