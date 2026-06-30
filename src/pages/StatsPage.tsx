@@ -132,10 +132,10 @@ export default function StatsPage() {
         <Card className="p-4 space-y-3">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-emerald-500" />
-            <h2 className="font-semibold text-sm">Bénéfice — {periodLabels[period]}</h2>
+            <h2 className="font-semibold text-sm">Performance — {periodLabels[period]}</h2>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="bg-blue-50 rounded-lg p-3">
               <p className="text-xs text-blue-600 font-medium">CA généré</p>
               <p className="text-lg font-bold text-blue-700">{formatCurrency(periodStats.revenue)}</p>
@@ -145,9 +145,22 @@ export default function StatsPage() {
               <p className="text-lg font-bold text-slate-700">{formatCurrency(periodStats.cost)}</p>
             </div>
             <div className="bg-emerald-50 rounded-lg p-3">
-              <p className="text-xs text-emerald-600 font-medium">Bénéfice net</p>
+              <p className="text-xs text-emerald-600 font-medium">Bénéfice brut</p>
               <p className="text-lg font-bold text-emerald-700">{formatCurrency(periodStats.profit)}</p>
             </div>
+            <div className="bg-red-50 rounded-lg p-3">
+              <p className="text-xs text-red-600 font-medium">Dépenses</p>
+              <p className="text-lg font-bold text-red-700">{formatCurrency(periodStats.expenses)}</p>
+            </div>
+          </div>
+
+          <div className={`rounded-lg p-3 ${periodStats.resultatNet >= 0 ? 'bg-emerald-100' : 'bg-red-100'}`}>
+            <p className={`text-xs font-semibold ${periodStats.resultatNet >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+              Résultat net (bénéfice − dépenses)
+            </p>
+            <p className={`text-2xl font-bold ${periodStats.resultatNet >= 0 ? 'text-emerald-800' : 'text-red-800'}`}>
+              {formatCurrency(periodStats.resultatNet)}
+            </p>
           </div>
 
           <p className="text-xs text-muted-foreground">{periodStats.salesCount} vente(s) sur la période</p>
