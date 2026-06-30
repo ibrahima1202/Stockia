@@ -8,6 +8,7 @@ import { formatCurrency } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useNavigate } from 'react-router-dom'
 import type { DashboardStats, Product, Sale } from '@/types'
+import { TrendingUp, ShoppingCart, AlertTriangle, Wallet, RefreshCw, ArrowRight, BarChart3 } from 'lucide-react'
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
@@ -114,14 +115,25 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Ruptures */}
-        <div
-          className={`rounded-xl border shadow-sm p-4 flex items-center gap-3 cursor-pointer transition-colors ${
-            (stats?.low_stock_count ?? 0) > 0
-              ? 'bg-orange-50 border-orange-200 hover:bg-orange-100'
-              : 'bg-white hover:bg-muted/30'
-          }`}
-          onClick={() => navigate('/stocks')}
+       {/* Statistiques */}
+<div
+  className={`rounded-xl border shadow-sm p-4 flex items-center gap-3 cursor-pointer transition-colors ${
+    (stats?.low_stock_count ?? 0) > 0
+      ? 'bg-orange-50 border-orange-200 hover:bg-orange-100'
+      : 'bg-white hover:bg-muted/30'
+  }`}
+  onClick={() => navigate('/stats')}
+>
+  <div className={`p-2.5 rounded-lg ${(stats?.low_stock_count ?? 0) > 0 ? 'bg-orange-100' : 'bg-purple-50'}`}>
+    <BarChart3 className={`h-5 w-5 ${(stats?.low_stock_count ?? 0) > 0 ? 'text-orange-500' : 'text-purple-600'}`} />
+  </div>
+  <div>
+    <p className={`text-2xl font-bold ${(stats?.low_stock_count ?? 0) > 0 ? 'text-orange-600' : 'text-foreground'}`}>
+      {stats?.low_stock_count ?? 0}
+    </p>
+    <p className="text-xs text-muted-foreground">Statistiques</p>
+  </div>
+</div>
         >
           <div className={`p-2.5 rounded-lg ${(stats?.low_stock_count ?? 0) > 0 ? 'bg-orange-100' : 'bg-slate-50'}`}>
             <AlertTriangle className={`h-5 w-5 ${(stats?.low_stock_count ?? 0) > 0 ? 'text-orange-500' : 'text-slate-400'}`} />
