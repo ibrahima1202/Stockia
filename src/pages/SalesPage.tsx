@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Minus, Trash2, ShoppingCart, Receipt, Pencil, XCircle, User } from 'lucide-react'
+import { Plus, Minus, Trash2, ShoppingCart, Receipt, Pencil, XCircle, User, Lock } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   Badge, EmptyState, Card
@@ -9,6 +9,7 @@ import { Select } from '@/components/ui/select'
 import { useSales } from '@/hooks/useSales'
 import { useProducts } from '@/hooks/useProducts'
 import { useClients } from '@/hooks/useClients'
+import { useReadOnly } from '@/hooks/useReadOnly'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 import type { Sale, SaleCartItem, PaymentMethod, SaleStatut } from '@/types'
 import { useToast } from '@/store/toastStore'
@@ -18,6 +19,7 @@ export default function SalesPage() {
   const { products } = useProducts()
   const { clients } = useClients()
   const toast = useToast()
+  const { isReadOnly } = useReadOnly()
 
   const [cart, setCart] = useState<SaleCartItem[]>([])
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('especes')
@@ -102,6 +104,7 @@ export default function SalesPage() {
   }
 
   const handleSubmitSale = async () => {
+    if (isReadOnly) return
     if (cart.length === 0) return
     if ((statut === 'credit' || statut === 'partiel') && !selectedClientId) {
       toast.error('Client requis', 'Sélectionnez un client pour une vente à crédit')
@@ -183,13 +186,24 @@ export default function SalesPage() {
 
   return (
     <div className="space-y-5">
+
+      {isReadOnly && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-center gap-2">
+          <Lock className="h-4 w-4 text-red-500 shrink-0" />
+          <p className="text-sm text-red-600">
+            Votre abonnement a expiré. Vous pouvez consulter vos données mais pas créer de nouvelles ventes.
+          </p>
+        </div>
+      )}
+
       <div className="page-header">
         <div>
           <h1 className="page-title">Ventes</h1>
           <p className="text-sm text-muted-foreground">{sales.length} vente(s)</p>
         </div>
-        <Button onClick={() => setActiveTab('new')}>
-          <Plus className="h-4 w-4" /> Nouvelle vente
+        <Button onClick={() => setActiveTab('new')} disabled={isReadOnly}>
+          {isReadOnly ? <Lock className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+          Nouvelle vente
         </Button>
       </div>
 
@@ -265,15 +279,16 @@ export default function SalesPage() {
                       <div className="flex items-center gap-1 justify-end">
                         <button
                           onClick={() => openEditModal(sale)}
-                          className="p-1.5 hover:bg-blue-50 rounded text-blue-500"
+                          disabled={isReadOnly}
+                          className="p-1.5 hover:bg-blue-50 rounded text-blue-500 disabled:opacity-30 disabled:cursor-not-allowed"
                           title="Modifier"
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => handleCancelSale(sale.id)}
-                          disabled={cancellingId === sale.id}
-                          className="p-1.5 hover:bg-red-50 rounded text-red-400"
+                          disabled={cancellingId === sale.id || isReadOnly}
+                          className="p-1.5 hover:bg-red-50 rounded text-red-400 disabled:opacity-30 disabled:cursor-not-allowed"
                           title="Annuler"
                         >
                           <XCircle className="h-3.5 w-3.5" />
@@ -346,7 +361,8 @@ export default function SalesPage() {
                   <select
                     value={selectedProductId}
                     onChange={(e) => setSelectedProductId(e.target.value)}
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    disabled={isReadOnly}
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
                   >
                     <option value="">Sélectionner un produit...</option>
                     {activeProducts.map((p) => (
@@ -361,9 +377,10 @@ export default function SalesPage() {
                   min="1"
                   value={qty}
                   onChange={(e) => setQty(parseInt(e.target.value) || 1)}
-                  className="w-20 h-9 rounded-md border border-input bg-background px-3 text-sm text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  disabled={isReadOnly}
+                  className="w-20 h-9 rounded-md border border-input bg-background px-3 text-sm text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
                 />
-                <Button onClick={addToCart} disabled={!selectedProductId}>
+                <Button onClick={addToCart} disabled={!selectedProductId || isReadOnly}>
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
@@ -395,14 +412,16 @@ export default function SalesPage() {
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => updateQty(item.product.id, item.quantity - 1)}
-                              className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted"
+                              disabled={isReadOnly}
+                              className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30"
                             >
                               <Minus className="h-3 w-3" />
                             </button>
                             <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
                             <button
                               onClick={() => updateQty(item.product.id, item.quantity + 1)}
-                              className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted"
+                              disabled={isReadOnly}
+                              className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30"
                             >
                               <Plus className="h-3 w-3" />
                             </button>
@@ -412,7 +431,8 @@ export default function SalesPage() {
                         <TableCell>
                           <button
                             onClick={() => removeFromCart(item.product.id)}
-                            className="p-1 hover:bg-red-50 rounded"
+                            disabled={isReadOnly}
+                            className="p-1 hover:bg-red-50 rounded disabled:opacity-30"
                           >
                             <Trash2 className="h-3.5 w-3.5 text-red-400" />
                           </button>
@@ -442,7 +462,8 @@ export default function SalesPage() {
                 <select
                   value={selectedClientId}
                   onChange={(e) => setSelectedClientId(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  disabled={isReadOnly}
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
                 >
                   <option value="">Aucun client</option>
                   {clients.map((c) => (
@@ -523,7 +544,7 @@ export default function SalesPage() {
               <Button
                 className="w-full"
                 onClick={handleSubmitSale}
-                disabled={cart.length === 0}
+                disabled={cart.length === 0 || isReadOnly}
                 isLoading={submitting}
               >
                 <Receipt className="h-4 w-4" />
