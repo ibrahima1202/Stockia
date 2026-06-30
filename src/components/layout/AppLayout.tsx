@@ -2,6 +2,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, Package, Warehouse, ShoppingCart, MoreHorizontal, BookOpen, Users, Truck, Receipt, X, User, LogOut, Settings } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { ToastContainer } from '@/components/ui/toast'
+import { SubscriptionBanner } from './SubscriptionBanner'
 import { useAuth } from '@/hooks/useAuth'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
@@ -59,7 +60,6 @@ export function AppLayout() {
             </div>
           </div>
 
-          {/* Bouton utilisateur cliquable */}
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
             className="flex items-center gap-2 bg-slate-800 rounded-full px-3 py-1.5"
@@ -75,6 +75,9 @@ export function AppLayout() {
           </button>
         </header>
 
+        {/* Bandeau abonnement */}
+        <SubscriptionBanner />
+
         {/* Menu utilisateur dropdown */}
         {showUserMenu && (
           <div
@@ -85,13 +88,11 @@ export function AppLayout() {
               className="absolute top-14 right-4 bg-slate-900 border border-slate-700 rounded-xl shadow-xl w-52 overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Infos utilisateur */}
               <div className="px-4 py-3 border-b border-slate-700">
                 <p className="text-white text-sm font-medium">{profile?.full_name}</p>
                 <p className="text-slate-400 text-xs capitalize">{profile?.role}</p>
               </div>
 
-              {/* Options */}
               <div className="py-1">
                 <button
                   onClick={() => { navigate('/profile'); setShowUserMenu(false) }}
@@ -101,7 +102,7 @@ export function AppLayout() {
                   Mon profil
                 </button>
                 <button
-                  onClick={() => { navigate('/profile'); setShowUserMenu(false) }}
+                  onClick={() => { navigate('/subscription'); setShowUserMenu(false) }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-200 hover:bg-slate-800 transition-colors text-sm"
                 >
                   <Settings className="h-4 w-4 text-slate-400" />
@@ -186,7 +187,6 @@ export function AppLayout() {
                 </NavLink>
               )
             })}
-            {/* Bouton Plus */}
             <button
               onClick={() => setShowMore(!showMore)}
               className="flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-colors"
