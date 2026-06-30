@@ -13,6 +13,7 @@ import ClientsPage from '@/pages/ClientsPage'
 import FournisseursPage from '@/pages/FournisseursPage'
 import ProfilePage from '@/pages/ProfilePage'
 import PaymentPage from '@/pages/PaymentPage'
+import SubscriptionPage from '@/pages/SubscriptionPage'
 
 export default function App() {
   return (
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="clients" element={<ClientsPage />} />
           <Route path="fournisseurs" element={<FournisseursPage />} />
           <Route path="profile" element={<ProfilePage />} />
+          <Route path="subscription" element={<SubscriptionPage />} />
           <Route
             path="expenses"
             element={
