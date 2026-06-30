@@ -15,6 +15,13 @@ const bottomNavItems = [
   { to: '/sales', icon: ShoppingCart, label: 'Ventes' },
 ]
 
+const moreNavItems = [
+  { to: '/clients', icon: Users, label: 'Clients' },
+  { to: '/fournisseurs', icon: Truck, label: 'Fournisseurs' },
+  { to: '/journal', icon: BookOpen, label: 'Journal' },
+  { to: '/expenses', icon: Receipt, label: 'Dépenses' },
+]
+
 export function AppLayout() {
   const { signOut } = useAuth()
   const { profile } = useAuthStore()
@@ -22,16 +29,6 @@ export function AppLayout() {
   const navigate = useNavigate()
   const [showMore, setShowMore] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
-
-  const moreNavItems = [
-    { to: '/clients', icon: Users, label: 'Clients' },
-    { to: '/fournisseurs', icon: Truck, label: 'Fournisseurs' },
-    { to: '/journal', icon: BookOpen, label: 'Journal' },
-    ...(profile?.role === 'admin'
-      ? [{ to: '/team', icon: UsersRound, label: 'Équipe' }]
-      : []),
-    { to: '/expenses', icon: Receipt, label: 'Dépenses' },
-  ]
 
   const isMoreActive = moreNavItems.some((item) =>
     location.pathname.startsWith(item.to)
@@ -104,6 +101,15 @@ export function AppLayout() {
                   <User className="h-4 w-4 text-slate-400" />
                   Mon profil
                 </button>
+                {profile?.role === 'admin' && (
+                  <button
+                    onClick={() => { navigate('/team'); setShowUserMenu(false) }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-200 hover:bg-slate-800 transition-colors text-sm"
+                  >
+                    <UsersRound className="h-4 w-4 text-slate-400" />
+                    Mon équipe
+                  </button>
+                )}
                 <button
                   onClick={() => { navigate('/subscription'); setShowUserMenu(false) }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-200 hover:bg-slate-800 transition-colors text-sm"
