@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Phone, MapPin, Wallet, XCircle, Pencil } from 'lucide-react'
+import { Plus, Phone, MapPin, Wallet, XCircle, Pencil, Lock, Crown } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   Badge, EmptyState, Card
@@ -7,11 +7,15 @@ import {
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { useClients } from '@/hooks/useClients'
+import { useSubscription } from '@/hooks/useSubscription'
 import { formatCurrency } from '@/lib/utils'
+import { useNavigate } from 'react-router-dom'
 import type { Client, PaymentMethod } from '@/types'
 
 export default function ClientsPage() {
   const { clients, isLoading, createClient, updateClient, deleteClient, addReglement } = useClients()
+  const { canAccessClientsAndFournisseurs } = useSubscription()
+  const navigate = useNavigate()
 
   // Modal création/édition
   const [showForm, setShowForm] = useState(false)
@@ -86,6 +90,49 @@ export default function ClientsPage() {
   const totalCredit = clients.reduce((sum, c) => sum + c.solde, 0)
 
   if (isLoading) return <LoadingScreen text="Chargement des clients..." />
+
+  // Blocage plan Starter
+  if (!canAccessClientsAndFournisseurs) {
+    return (
+      <div className="space-y-5">
+        <div className="flex flex-col items-center justify-center py-16 space-y-5 text-center">
+          <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center">
+            <Lock className="h-10 w-10 text-orange-500" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">Fonctionnalité Business</h1>
+            <p className="text-sm text-muted-foreground mt-2 max-w-sm">
+              La gestion des clients et crédits est disponible à partir du plan Business.
+            </p>
+          </div>
+          <Card className="p-5 w-full max-w-sm text-left space-y-3">
+            <div className="flex items-center gap-2">
+              <Crown className="h-4 w-4 text-orange-500" />
+              <p className="font-semibold text-sm">Plan Business — 7 500 XOF/mois</p>
+            </div>
+            <ul className="space-y-1.5">
+              {[
+                'Tout le plan Starter',
+                'Gestion des clients',
+                'Ventes à crédit',
+                'Règlements clients',
+                'Gestion des fournisseurs',
+                '3 utilisateurs',
+                'Produits illimités',
+              ].map((f) => (
+                <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
+                  <span className="text-emerald-500">✓</span> {f}
+                </li>
+              ))}
+            </ul>
+            <Button className="w-full" onClick={() => navigate('/subscription')}>
+              Passer au plan Business
+            </Button>
+          </Card>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5">
