@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Minus, Trash2, ShoppingCart, Receipt, Pencil, XCircle, User, Lock } from 'lucide-react'
+import { Plus, Minus, Trash2, ShoppingCart, Receipt, Pencil, XCircle, User, Lock, Search } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   Badge, EmptyState, Card
@@ -11,7 +11,7 @@ import { useProducts } from '@/hooks/useProducts'
 import { useClients } from '@/hooks/useClients'
 import { useReadOnly } from '@/hooks/useReadOnly'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
-import type { Sale, SaleCartItem, PaymentMethod, SaleStatut } from '@/types'
+import type { Sale, SaleCartItem, PaymentMethod, SaleStatut, Product } from '@/types'
 import { useToast } from '@/store/toastStore'
 
 export default function SalesPage() {
@@ -32,6 +32,10 @@ export default function SalesPage() {
   const [selectedProductId, setSelectedProductId] = useState('')
   const [qty, setQty] = useState(1)
 
+  // Recherche produit
+  const [productSearch, setProductSearch] = useState('')
+  const [showProductDropdown, setShowProductDropdown] = useState(false)
+
   // Annulation
   const [cancellingId, setCancellingId] = useState<string | null>(null)
 
@@ -46,6 +50,16 @@ export default function SalesPage() {
     [products]
   )
 
+  const filteredProducts = useMemo(() => {
+    if (!productSearch.trim()) return activeProducts
+    const search = productSearch.toLowerCase()
+    return activeProducts.filter(
+      (p) => p.name.toLowerCase().includes(search) || p.reference.toLowerCase().includes(search)
+    )
+  }, [activeProducts, productSearch])
+
+  const selectedProduct = products.find((p) => p.id === selectedProductId)
+
   const cartTotal = cart.reduce((sum, item) => sum + item.total_price, 0)
 
   const montantDu = statut === 'credit'
@@ -53,6 +67,12 @@ export default function SalesPage() {
     : statut === 'partiel'
     ? cartTotal - (parseFloat(montantPaye) || 0)
     : 0
+
+  const selectProduct = (product: Product) => {
+    setSelectedProductId(product.id)
+    setProductSearch(product.name)
+    setShowProductDropdown(false)
+  }
 
   const addToCart = () => {
     const product = products.find((p) => p.id === selectedProductId)
@@ -82,6 +102,7 @@ export default function SalesPage() {
       ]
     })
     setSelectedProductId('')
+    setProductSearch('')
     setQty(1)
   }
 
@@ -357,20 +378,52 @@ export default function SalesPage() {
             <Card className="p-4">
               <h3 className="font-medium text-sm mb-3">Ajouter un produit</h3>
               <div className="flex gap-2">
-                <div className="flex-1">
-                  <select
-                    value={selectedProductId}
-                    onChange={(e) => setSelectedProductId(e.target.value)}
-                    disabled={isReadOnly}
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
-                  >
-                    <option value="">Sélectionner un produit...</option>
-                    {activeProducts.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} — {formatCurrency(p.selling_price)} (stock: {p.stock_current})
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex-1 relative">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={productSearch}
+                      onChange={(e) => {
+                        setProductSearch(e.target.value)
+                        setSelectedProductId('')
+                        setShowProductDropdown(true)
+                      }}
+                      onFocus={() => setShowProductDropdown(true)}
+                      disabled={isReadOnly}
+                      placeholder="Rechercher un produit par nom..."
+                      className="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+                    />
+                  </div>
+
+                  {showProductDropdown && productSearch && (
+                    <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg max-h-64 overflow-y-auto">
+                      {filteredProducts.length === 0 ? (
+                        <p className="px-3 py-2.5 text-sm text-muted-foreground">Aucun produit trouvé</p>
+                      ) : (
+                        filteredProducts.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => selectProduct(p)}
+                            className="w-full text-left px-3 py-2.5 text-sm hover:bg-orange-50 transition-colors border-b last:border-b-0"
+                          >
+                            <p className="font-medium text-slate-900">{p.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatCurrency(p.selling_price)} · Stock: {p.stock_current} · Réf: {p.reference}
+                            </p>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {showProductDropdown && (
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setShowProductDropdown(false)}
+                    />
+                  )}
                 </div>
                 <input
                   type="number"
@@ -384,6 +437,11 @@ export default function SalesPage() {
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
+              {selectedProduct && (
+                <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1">
+                  ✓ {selectedProduct.name} sélectionné — {formatCurrency(selectedProduct.selling_price)} (stock: {selectedProduct.stock_current})
+                </p>
+              )}
             </Card>
 
             <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
