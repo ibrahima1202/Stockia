@@ -114,14 +114,21 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Statistiques */}
-        <div
-          className={`rounded-xl border shadow-sm p-4 flex items-center gap-3 cursor-pointer transition-colors ${
-            (stats?.low_stock_count ?? 0) > 0
-              ? 'bg-orange-50 border-orange-200 hover:bg-orange-100'
-              : 'bg-white hover:bg-muted/30'
-          }`}
-          onClick={() => navigate('/stats')}
+       {/* Statistiques */}
+<div
+  className="rounded-xl border border-orange-200 bg-orange-50 hover:bg-orange-100 shadow-sm p-4 flex items-center gap-3 cursor-pointer transition-colors"
+  onClick={() => navigate('/stats')}
+>
+  <div className="bg-orange-100 p-2.5 rounded-lg">
+    <BarChart3 className="h-5 w-5 text-orange-500" />
+  </div>
+  <div>
+    <p className="text-lg font-bold text-orange-700">
+      Voir le détail
+    </p>
+    <p className="text-xs text-orange-600">Bénéfices et fonds de roulement</p>
+  </div>
+</div>
         >
           <div className={`p-2.5 rounded-lg ${(stats?.low_stock_count ?? 0) > 0 ? 'bg-orange-100' : 'bg-purple-50'}`}>
             <BarChart3 className={`h-5 w-5 ${(stats?.low_stock_count ?? 0) > 0 ? 'text-orange-500' : 'text-purple-600'}`} />
