@@ -81,6 +81,7 @@ const canAccessClientsAndFournisseurs =
     canAddProduct,
     canAddUser,
     canAccessStats,
+    canAccessClientsAndFournisseurs,
     currentPlan,
   }
 }
