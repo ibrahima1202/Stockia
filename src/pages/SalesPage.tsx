@@ -396,7 +396,7 @@ export default function SalesPage() {
                     />
                   </div>
 
-                  {showProductDropdown && productSearch && (
+                  {showProductDropdown && (
                     <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg max-h-64 overflow-y-auto">
                       {filteredProducts.length === 0 ? (
                         <p className="px-3 py-2.5 text-sm text-muted-foreground">Aucun produit trouvé</p>
