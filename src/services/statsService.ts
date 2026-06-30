@@ -9,7 +9,6 @@ export interface ProductStat {
   cost: number
   profit: number
 }
-
 export interface PeriodStats {
   revenue: number
   cost: number
@@ -17,13 +16,19 @@ export interface PeriodStats {
   salesCount: number
   productStats: ProductStat[]
 }
-
 export interface FondsRoulement {
   stockValue: number
   cashBalance: number
   clientsReceivables: number
   fournisseursDebts: number
   total: number
+}
+
+interface ProductJoin {
+  id: string
+  name: string
+  reference: string
+  purchase_price: number
 }
 
 export const statsService = {
@@ -41,7 +46,10 @@ export const statsService = {
 
     for (const sale of sales || []) {
       for (const item of sale.sale_items || []) {
-        const product = item.product
+        const rawProduct = item.product as unknown
+        const product: ProductJoin | null = Array.isArray(rawProduct)
+          ? (rawProduct[0] as ProductJoin) ?? null
+          : (rawProduct as ProductJoin) ?? null
         if (!product) continue
 
         const itemRevenue = item.total_price
@@ -81,7 +89,6 @@ export const statsService = {
   },
 
   async getFondsRoulement(): Promise<FondsRoulement> {
-    // 1. Valeur du stock (prix d'achat × quantité)
     const { data: products, error: pError } = await supabase
       .from('products')
       .select('stock_current, purchase_price')
@@ -91,7 +98,6 @@ export const statsService = {
       (sum, p) => sum + p.stock_current * p.purchase_price, 0
     )
 
-    // 2. Solde caisse (dernière entrée journal)
     const { data: journal, error: jError } = await supabase
       .from('journal_entries')
       .select('balance')
@@ -101,14 +107,12 @@ export const statsService = {
       .single()
     const cashBalance = jError ? 0 : (journal?.balance ?? 0)
 
-    // 3. Créances clients (total des soldes clients)
     const { data: clients, error: cError } = await supabase
       .from('clients')
       .select('solde')
     if (cError) throw cError
     const clientsReceivables = (clients || []).reduce((sum, c) => sum + c.solde, 0)
 
-    // 4. Dettes fournisseurs
     const { data: fournisseurs, error: fError } = await supabase
       .from('fournisseurs')
       .select('solde')
