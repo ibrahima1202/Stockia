@@ -14,6 +14,8 @@ export interface PeriodStats {
   cost: number
   profit: number
   salesCount: number
+  expenses: number
+  resultatNet: number
   productStats: ProductStat[]
 }
 export interface FondsRoulement {
@@ -23,7 +25,6 @@ export interface FondsRoulement {
   fournisseursDebts: number
   total: number
 }
-
 interface ProductJoin {
   id: string
   name: string
@@ -78,12 +79,26 @@ export const statsService = {
     }
 
     const productStats = Array.from(productMap.values()).sort((a, b) => b.profit - a.profit)
+    const grossProfit = totalRevenue - totalCost
+
+    // Dépenses de la période (loyer, transport, divers)
+    const { data: expensesData, error: expError } = await supabase
+      .from('expenses')
+      .select('amount')
+      .gte('expense_date', startDate)
+      .lte('expense_date', endDate)
+    if (expError) throw expError
+    const totalExpenses = (expensesData || []).reduce((sum, e) => sum + e.amount, 0)
+
+    const resultatNet = grossProfit - totalExpenses
 
     return {
       revenue: totalRevenue,
       cost: totalCost,
-      profit: totalRevenue - totalCost,
+      profit: grossProfit,
       salesCount: sales?.length ?? 0,
+      expenses: totalExpenses,
+      resultatNet,
       productStats,
     }
   },
