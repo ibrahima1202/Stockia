@@ -62,6 +62,10 @@ export function useSubscription() {
   // Statistiques réservées au plan Pro
   const canAccessStats = subscription?.plan?.slug === 'pro'
 
+const canAccessClientsAndFournisseurs =
+  subscription?.plan?.slug === 'business' ||
+  subscription?.plan?.slug === 'pro'
+
   const currentPlan = subscription?.plan ?? null
 
   return {
