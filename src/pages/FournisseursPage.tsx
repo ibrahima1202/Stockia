@@ -11,6 +11,9 @@ import { useProducts } from '@/hooks/useProducts'
 import { useCategories } from '@/hooks/useProducts'
 import { formatCurrency } from '@/lib/utils'
 import type { Fournisseur, PaymentMethod, AchatCartItem, AchatStatut } from '@/types'
+import { useSubscription } from '@/hooks/useSubscription'
+import { useNavigate } from 'react-router-dom'
+import { Lock, Crown } from 'lucide-react'
 
 export default function FournisseursPage() {
   const {
@@ -20,6 +23,9 @@ export default function FournisseursPage() {
   } = useFournisseurs()
   const { products, reload: reloadProducts } = useProducts()
   const { categories, createCategory } = useCategories()
+  const { canAccessClientsAndFournisseurs } = useSubscription()
+const navigate = useNavigate()
+
 
   // Modal création/édition fournisseur
   const [showForm, setShowForm] = useState(false)
@@ -227,6 +233,48 @@ export default function FournisseursPage() {
   const totalDettes = fournisseurs.reduce((sum, f) => sum + f.solde, 0)
 
   if (isLoading) return <LoadingScreen text="Chargement des fournisseurs..." />
+
+  if (!canAccessClientsAndFournisseurs) {
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col items-center justify-center py-16 space-y-5 text-center">
+        <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center">
+          <Lock className="h-10 w-10 text-orange-500" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Fonctionnalité Business</h1>
+          <p className="text-sm text-muted-foreground mt-2 max-w-sm">
+            La gestion des fournisseurs et achats est disponible à partir du plan Business.
+          </p>
+        </div>
+        <Card className="p-5 w-full max-w-sm text-left space-y-3">
+          <div className="flex items-center gap-2">
+            <Crown className="h-4 w-4 text-orange-500" />
+            <p className="font-semibold text-sm">Plan Business — 7 500 XOF/mois</p>
+          </div>
+          <ul className="space-y-1.5">
+            {[
+              'Tout le plan Starter',
+              'Gestion des fournisseurs',
+              'Factures d\'achat',
+              'Gestion des dettes',
+              'Gestion des clients',
+              '3 utilisateurs',
+              'Produits illimités',
+            ].map((f) => (
+              <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
+                <span className="text-emerald-500">✓</span> {f}
+              </li>
+            ))}
+          </ul>
+          <Button className="w-full" onClick={() => navigate('/subscription')}>
+            Passer au plan Business
+          </Button>
+        </Card>
+      </div>
+    </div>
+  )
+}
 
   return (
     <div className="space-y-5">
