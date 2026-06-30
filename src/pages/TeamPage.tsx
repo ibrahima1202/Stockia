@@ -7,6 +7,7 @@ import { useSubscription } from '@/hooks/useSubscription'
 export default function TeamPage() {
   const { members, isLoading, updateRole, toggleActive } = useTeam()
   const { profile: currentProfile } = useAuthStore()
+  console.log('DEBUG business_id:', currentProfile?.business_id)
   const { subscription } = useSubscription()
 
   const activeMembers = members.filter((m) => m.is_active !== false)
