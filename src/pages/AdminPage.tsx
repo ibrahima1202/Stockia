@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { CheckCircle, Crown, RefreshCw, Building2, Calendar, CreditCard } from 'lucide-react'
-import { Card, LoadingScreen, Badge } from '@/components/ui/index'
+import { LoadingScreen, Badge } from '@/components/ui/index'
 import { Button } from '@/components/ui/button'
 import { adminService, type AdminBusiness } from '@/services/adminService'
 import { useAuthStore } from '@/store/authStore'
