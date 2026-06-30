@@ -19,7 +19,7 @@ export default function FournisseursPage() {
     createProduct, addAchat, addReglement
   } = useFournisseurs()
   const { products, reload: reloadProducts } = useProducts()
-  const { categories } = useCategories()
+  const { categories, createCategory } = useCategories()
 
   // Modal création/édition fournisseur
   const [showForm, setShowForm] = useState(false)
@@ -45,6 +45,11 @@ export default function FournisseursPage() {
     name: '', reference: '', category_id: '', purchase_price: '', selling_price: ''
   })
   const [newProductSubmitting, setNewProductSubmitting] = useState(false)
+
+  // Modal création rapide catégorie
+  const [showNewCategory, setShowNewCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [newCategorySubmitting, setNewCategorySubmitting] = useState(false)
 
   // Modal règlement
   const [reglementFourn, setReglementFourn] = useState<Fournisseur | null>(null)
@@ -188,6 +193,20 @@ export default function FournisseursPage() {
     } catch {
     } finally {
       setNewProductSubmitting(false)
+    }
+  }
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) return
+    setNewCategorySubmitting(true)
+    try {
+      const category = await createCategory(newCategoryName.trim())
+      setNewProductData({ ...newProductData, category_id: category.id })
+      setShowNewCategory(false)
+      setNewCategoryName('')
+    } catch {
+    } finally {
+      setNewCategorySubmitting(false)
     }
   }
 
@@ -550,7 +569,15 @@ export default function FournisseursPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Catégorie</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium">Catégorie</label>
+                  <button
+                    onClick={() => setShowNewCategory(true)}
+                    className="text-xs text-primary flex items-center gap-1 hover:underline"
+                  >
+                    <Plus className="h-3 w-3" /> Nouvelle catégorie
+                  </button>
+                </div>
                 <select
                   value={newProductData.category_id}
                   onChange={(e) => setNewProductData({ ...newProductData, category_id: e.target.value })}
@@ -588,6 +615,39 @@ export default function FournisseursPage() {
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setShowNewProduct(false)}>Annuler</Button>
               <Button className="flex-1" onClick={handleCreateProduct} isLoading={newProductSubmitting}>
+                Créer
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal création rapide catégorie */}
+      {showNewCategory && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 space-y-4">
+            <h2 className="font-semibold text-lg">Nouvelle catégorie</h2>
+            <div>
+              <label className="block text-sm font-medium mb-1">Nom de la catégorie *</label>
+              <input
+                type="text"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                placeholder="Ex: Plomberie, Électricité..."
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => { setShowNewCategory(false); setNewCategoryName('') }}>
+                Annuler
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleCreateCategory}
+                isLoading={newCategorySubmitting}
+                disabled={!newCategoryName.trim()}
+              >
                 Créer
               </Button>
             </div>
