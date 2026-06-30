@@ -67,6 +67,7 @@ export function useProducts() {
 export function useCategories() {
   const [categories, setCategories] = useState<Category[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const toast = useToast()
 
   const load = useCallback(async () => {
     try {
@@ -81,5 +82,12 @@ export function useCategories() {
 
   useEffect(() => { load() }, [load])
 
-  return { categories, isLoading, reload: load }
+  const createCategory = async (name: string): Promise<Category> => {
+    const category = await productService.createCategory(name)
+    setCategories((prev) => [...prev, category].sort((a, b) => a.name.localeCompare(b.name)))
+    toast.success('Catégorie créée', category.name)
+    return category
+  }
+
+  return { categories, isLoading, reload: load, createCategory }
 }
