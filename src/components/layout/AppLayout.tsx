@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Package, Warehouse, ShoppingCart, MoreHorizontal, BookOpen, Users, Truck, Receipt, X, User, LogOut, Settings } from 'lucide-react'
+import { LayoutDashboard, Package, Warehouse, ShoppingCart, MoreHorizontal, BookOpen, Users, Truck, Receipt, X, User, LogOut, Settings, UsersRound } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { ToastContainer } from '@/components/ui/toast'
 import { SubscriptionBanner } from './SubscriptionBanner'
@@ -15,13 +15,6 @@ const bottomNavItems = [
   { to: '/sales', icon: ShoppingCart, label: 'Ventes' },
 ]
 
-const moreNavItems = [
-  { to: '/clients', icon: Users, label: 'Clients' },
-  { to: '/fournisseurs', icon: Truck, label: 'Fournisseurs' },
-  { to: '/journal', icon: BookOpen, label: 'Journal' },
-  { to: '/expenses', icon: Receipt, label: 'Dépenses' },
-]
-
 export function AppLayout() {
   const { signOut } = useAuth()
   const { profile } = useAuthStore()
@@ -29,6 +22,16 @@ export function AppLayout() {
   const navigate = useNavigate()
   const [showMore, setShowMore] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
+
+  const moreNavItems = [
+    { to: '/clients', icon: Users, label: 'Clients' },
+    { to: '/fournisseurs', icon: Truck, label: 'Fournisseurs' },
+    { to: '/journal', icon: BookOpen, label: 'Journal' },
+    ...(profile?.role === 'admin'
+      ? [{ to: '/team', icon: UsersRound, label: 'Équipe' }]
+      : []),
+    { to: '/expenses', icon: Receipt, label: 'Dépenses' },
+  ]
 
   const isMoreActive = moreNavItems.some((item) =>
     location.pathname.startsWith(item.to)
