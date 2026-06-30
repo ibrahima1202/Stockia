@@ -59,6 +59,9 @@ export function useSubscription() {
   const canAddUser = (currentCount: number) =>
     subscription ? subscriptionService.canAddUser(subscription, currentCount) : false
 
+  // Statistiques réservées au plan Pro
+  const canAccessStats = subscription?.plan?.slug === 'pro'
+
   const currentPlan = subscription?.plan ?? null
 
   return {
@@ -73,6 +76,7 @@ export function useSubscription() {
     daysLeftInTrial,
     canAddProduct,
     canAddUser,
+    canAccessStats,
     currentPlan,
   }
 }
