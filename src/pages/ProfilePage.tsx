@@ -1,20 +1,21 @@
 import { useState } from 'react'
-import { User, Building2, Trash2, Crown, Calendar } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { User, Building2, Trash2, Crown, Calendar, ChevronRight, Pencil } from 'lucide-react'
 import { Card } from '@/components/ui/index'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/store/authStore'
 import { useSubscription } from '@/hooks/useSubscription'
 import { profileService } from '@/services/profileService'
 import { subscriptionService } from '@/services/subscriptionService'
-import { formatCurrency } from '@/lib/utils'
 import { useToast } from '@/store/toastStore'
-import { useNavigate } from 'react-router-dom'
 
 export default function ProfilePage() {
   const { user, profile, setProfile } = useAuthStore()
-  const { subscription, business, plans, reload } = useSubscription()
+  const { subscription, business, reload } = useSubscription()
   const toast = useToast()
   const navigate = useNavigate()
+
+  const [editingProfile, setEditingProfile] = useState(false)
   const [fullName, setFullName] = useState(profile?.full_name ?? '')
   const [profileSubmitting, setProfileSubmitting] = useState(false)
   const [cleanConfirm, setCleanConfirm] = useState(false)
@@ -27,6 +28,7 @@ export default function ProfilePage() {
       const updated = await profileService.updateProfile(user.id, { full_name: fullName })
       setProfile(updated)
       toast.success('Profil mis à jour')
+      setEditingProfile(false)
     } catch {
       toast.error('Erreur', 'Impossible de mettre à jour le profil')
     } finally {
@@ -43,16 +45,15 @@ export default function ProfilePage() {
     try {
       await profileService.cleanDemoData()
       toast.success('Données nettoyées', 'Les données de test ont été supprimées')
-      reload() // ✅ Rafraîchit l'état après nettoyage
+      reload()
     } catch {
       toast.error('Erreur', 'Impossible de nettoyer les données')
     } finally {
       setCleanSubmitting(false)
-      setCleanConfirm(false) // ✅ Réinitialise dans tous les cas (succès ou erreur)
+      setCleanConfirm(false)
     }
   }
 
-  // ✅ Guard : isTrialing vérifié avant d'accéder à trial_ends_at
   const isTrialing = subscription?.status === 'trial'
   const daysLeft = isTrialing ? subscriptionService.getDaysLeftInTrial(subscription!) : 0
 
@@ -63,20 +64,23 @@ export default function ProfilePage() {
         <p className="text-sm text-muted-foreground">Informations personnelles et abonnement</p>
       </div>
 
-      {/* Abonnement */}
-      <Card className="p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <Crown className="h-4 w-4 text-orange-500" />
-          <h2 className="font-semibold text-sm">Mon abonnement</h2>
+      {/* Abonnement — résumé avec lien */}
+      <Card
+        className="p-4 space-y-3 cursor-pointer hover:bg-muted/30 transition-colors"
+        onClick={() => navigate('/subscription')}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Crown className="h-4 w-4 text-orange-500" />
+            <h2 className="font-semibold text-sm">Mon abonnement</h2>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </div>
 
         {isTrialing && (
           <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
             <p className="text-sm text-orange-700 font-medium">
               ⏳ Essai gratuit — {daysLeft} jour(s) restant(s)
-            </p>
-            <p className="text-xs text-orange-600 mt-0.5">
-              Choisissez un plan avant la fin de votre essai.
             </p>
           </div>
         )}
@@ -103,65 +107,72 @@ export default function ProfilePage() {
           </div>
         )}
 
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Changer de plan</p>
-          {plans.map((plan) => (
-            <div
-              key={plan.id}
-              className={`flex items-center justify-between p-3 border rounded-lg ${
-                subscription?.plan_id === plan.id ? 'border-orange-500 bg-orange-50' : 'border-slate-200'
-              }`}
-            >
-              <div>
-                <p className="text-sm font-medium">{plan.name}</p>
-                <p className="text-xs text-muted-foreground">{formatCurrency(plan.price)}/mois</p>
-              </div>
-              {subscription?.plan_id === plan.id ? (
-                <span className="text-xs text-orange-500 font-medium">Plan actuel</span>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => navigate(`/payment?plan=${plan.id}`)}
-                >
-                  Choisir
-                </Button>
-              )}
-            </div>
-          ))}
-        </div>
+        <p className="text-xs text-primary font-medium">Voir tous les plans →</p>
       </Card>
 
-      {/* Infos personnelles */}
+      {/* Infos personnelles — lecture seule */}
       <Card className="p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <User className="h-4 w-4 text-blue-500" />
-          <h2 className="font-semibold text-sm">Informations personnelles</h2>
-        </div>
-        <div className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium mb-1">Nom complet</label>
-            <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-blue-500" />
+            <h2 className="font-semibold text-sm">Informations personnelles</h2>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
-            <input
-              type="email"
-              value={user?.email ?? ''}
-              disabled
-              className="w-full h-9 rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground"
-            />
-            <p className="text-xs text-muted-foreground mt-1">L'email ne peut pas être modifié</p>
-          </div>
+          {!editingProfile && (
+            <button
+              onClick={() => setEditingProfile(true)}
+              className="p-1.5 hover:bg-blue-50 rounded text-blue-500"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
-        <Button onClick={handleUpdateProfile} isLoading={profileSubmitting} size="sm">
-          Enregistrer
-        </Button>
+
+        {!editingProfile ? (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between py-1.5 border-b">
+              <span className="text-xs text-muted-foreground">Nom complet</span>
+              <span className="text-sm font-medium">{profile?.full_name}</span>
+            </div>
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-xs text-muted-foreground">Email</span>
+              <span className="text-sm">{user?.email}</span>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">Nom complet</label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Email</label>
+              <input
+                type="email"
+                value={user?.email ?? ''}
+                disabled
+                className="w-full h-9 rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground"
+              />
+              <p className="text-xs text-muted-foreground mt-1">L'email ne peut pas être modifié</p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setEditingProfile(false); setFullName(profile?.full_name ?? '') }}
+              >
+                Annuler
+              </Button>
+              <Button onClick={handleUpdateProfile} isLoading={profileSubmitting} size="sm">
+                Enregistrer
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Commerce */}
