@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/authStore'
 import { authService } from '@/services/authService'
@@ -8,11 +7,9 @@ import { useToast } from '@/store/toastStore'
 export function useAuth() {
   const { user, profile, isLoading, setUser, setProfile, setLoading, reset } =
     useAuthStore()
-  const navigate = useNavigate()
   const toast = useToast()
 
   useEffect(() => {
-    // Timeout de sécurité : force isLoading=false après 5 secondes max
     const timeout = setTimeout(() => setLoading(false), 5000)
 
     const initSession = async () => {
@@ -44,7 +41,7 @@ export function useAuth() {
           } catch {}
         } else if (event === 'SIGNED_OUT') {
           reset()
-          navigate('/login')
+          window.location.href = '/login'
         }
       }
     )
@@ -58,7 +55,8 @@ export function useAuth() {
   const signIn = async (email: string, password: string) => {
     try {
       await authService.signIn(email, password)
-      navigate('/')
+      // Rechargement complet pour vider tous les caches React
+      window.location.href = '/'
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erreur de connexion'
       toast.error('Connexion échouée', msg)
@@ -71,7 +69,8 @@ export function useAuth() {
       await authService.signOut()
     } catch {
       reset()
-      navigate('/login')
+    } finally {
+      window.location.href = '/login'
     }
   }
 
