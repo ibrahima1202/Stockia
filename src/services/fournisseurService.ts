@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import type { Fournisseur, AchatFournisseur, ReglementFournisseur, PaymentMethod, CreateAchatPayload, Product } from '@/types'
 import { generateReference } from '@/lib/utils'
+import { getBusinessId } from '@/lib/business'
 import { format } from 'date-fns'
 
 export const fournisseurService = {
@@ -29,7 +30,7 @@ export const fournisseurService = {
   ): Promise<Fournisseur> {
     const { data, error } = await supabase
       .from('fournisseurs')
-      .insert({ ...fournisseur, solde: 0, created_by: userId })
+      .insert({ ...fournisseur, solde: 0, created_by: userId, business_id: getBusinessId() })
       .select()
       .single()
     if (error) throw error
@@ -55,12 +56,9 @@ export const fournisseurService = {
     if (error) throw error
   },
 
-  // ============================================================
-  // CRÉATION RAPIDE DE PRODUIT
-  // ============================================================
- async createProduct(
-  product: { name: string; reference: string; category_id?: string; purchase_price: number; selling_price: number }
-): Promise<Product> {
+  async createProduct(
+    product: { name: string; reference: string; category_id?: string; purchase_price: number; selling_price: number }
+  ): Promise<Product> {
     const { data, error } = await supabase
       .from('products')
       .insert({
@@ -68,6 +66,7 @@ export const fournisseurService = {
         stock_current: 0,
         stock_minimum: 5,
         is_active: true,
+        business_id: getBusinessId(),
       })
       .select('*, category:categories(*)')
       .single()
@@ -75,9 +74,6 @@ export const fournisseurService = {
     return data
   },
 
-  // ============================================================
-  // ACHATS FOURNISSEUR
-  // ============================================================
   async getAchats(fournisseurId: string): Promise<AchatFournisseur[]> {
     const { data, error } = await supabase
       .from('achats_fournisseurs')
@@ -99,6 +95,7 @@ export const fournisseurService = {
       ? 0
       : (payload.montant_paye ?? 0)
     const montantDu = montantTotal - montantPaye
+    const businessId = getBusinessId()
 
     // 1. Créer la facture d'achat
     const { data: achat, error: aError } = await supabase
@@ -113,6 +110,7 @@ export const fournisseurService = {
         notes: payload.notes,
         achat_date: today,
         created_by: userId,
+        business_id: businessId,
       })
       .select()
       .single()
@@ -125,6 +123,7 @@ export const fournisseurService = {
       quantity: item.quantity,
       unit_price: item.unit_price,
       total_price: item.total_price,
+      business_id: businessId,
     }))
     const { error: itemsError } = await supabase.from('achat_items').insert(achatItems)
     if (itemsError) throw itemsError
@@ -144,7 +143,6 @@ export const fournisseurService = {
         .eq('id', item.product.id)
       if (stockError) throw stockError
 
-      // Mouvement de stock
       const { error: movError } = await supabase.from('stock_movements').insert({
         product_id: item.product.id,
         type: 'entree',
@@ -152,13 +150,13 @@ export const fournisseurService = {
         reason: `Achat fournisseur ${reference}`,
         reference,
         created_by: userId,
+        business_id: businessId,
       })
       if (movError) throw movError
     }
 
     // 4. Journal
     if (montantPaye > 0) {
-      // Sortie caisse si comptant ou partiel
       const { error: jError } = await supabase.from('journal_entries').insert({
         entry_date: today,
         reference,
@@ -167,6 +165,7 @@ export const fournisseurService = {
         credit: montantPaye,
         source_type: 'achat_fournisseur',
         source_id: achat.id,
+        business_id: businessId,
       })
       if (jError) throw jError
     }
@@ -190,9 +189,6 @@ export const fournisseurService = {
     return achat
   },
 
-  // ============================================================
-  // RÈGLEMENTS FOURNISSEURS
-  // ============================================================
   async getReglements(fournisseurId: string): Promise<ReglementFournisseur[]> {
     const { data, error } = await supabase
       .from('reglements_fournisseurs')
@@ -210,6 +206,8 @@ export const fournisseurService = {
     notes: string,
     userId: string
   ): Promise<ReglementFournisseur> {
+    const businessId = getBusinessId()
+
     const { data: reglement, error: rError } = await supabase
       .from('reglements_fournisseurs')
       .insert({
@@ -219,6 +217,7 @@ export const fournisseurService = {
         notes,
         reglement_date: format(new Date(), 'yyyy-MM-dd'),
         created_by: userId,
+        business_id: businessId,
       })
       .select()
       .single()
@@ -246,6 +245,7 @@ export const fournisseurService = {
       credit: montant,
       source_type: 'reglement_fournisseur',
       source_id: reglement.id,
+      business_id: businessId,
     })
     if (jError) throw jError
 
