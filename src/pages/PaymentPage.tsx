@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { CheckCircle, Copy, Phone, Smartphone } from 'lucide-react'
+import { CheckCircle, Copy, Phone, Smartphone, CreditCard, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useSubscription } from '@/hooks/useSubscription'
 import { supabase } from '@/lib/supabase'
@@ -11,6 +11,15 @@ const WAVE_NUMBER = '79740816'
 const ORANGE_NUMBER = '79740816'
 const RECIPIENT_NAME = 'Ibrahima Sidibé'
 
+const FEDAPAY_PUBLIC_KEY = import.meta.env.VITE_FEDAPAY_PUBLIC_KEY as string
+const FEDAPAY_ENV = (import.meta.env.VITE_FEDAPAY_ENV as string) || 'sandbox'
+
+declare global {
+  interface Window {
+    FedaPay: any
+  }
+}
+
 export default function PaymentPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -20,14 +29,86 @@ export default function PaymentPage() {
   const planId = searchParams.get('plan')
   const plan = plans.find((p) => p.id === planId)
 
-  const [selectedMethod, setSelectedMethod] = useState<'wave' | 'orange'>('wave')
+  const [selectedMethod, setSelectedMethod] = useState<'wave' | 'orange' | 'fedapay'>('fedapay')
   const [reference, setReference] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
+  const [fedapayReady, setFedapayReady] = useState(false)
+  const [fedapayStatus, setFedapayStatus] = useState<'idle' | 'verifying' | 'success' | 'timeout'>('idle')
+  const pollRef = useRef<number | null>(null)
+
+  // Charger le script Checkout.js de FedaPay une seule fois
+  useEffect(() => {
+    if (window.FedaPay) {
+      setFedapayReady(true)
+      return
+    }
+    const script = document.createElement('script')
+    script.src = 'https://cdn.fedapay.com/checkout.js?v=1.1.7'
+    script.async = true
+    script.onload = () => setFedapayReady(true)
+    document.body.appendChild(script)
+    return () => {
+      if (pollRef.current) window.clearInterval(pollRef.current)
+    }
+  }, [])
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
     toast.success('Copié !', text)
+  }
+
+  // Après le paiement FedaPay, on vérifie côté base que le webhook a bien activé l'abonnement
+  const pollSubscriptionActivation = (targetPlanId: string) => {
+    setFedapayStatus('verifying')
+    let attempts = 0
+    pollRef.current = window.setInterval(async () => {
+      attempts += 1
+      const { data } = await supabase
+        .from('subscriptions')
+        .select('status, plan_id')
+        .eq('id', subscription?.id)
+        .single()
+
+      if (data && data.status === 'active' && data.plan_id === targetPlanId) {
+        if (pollRef.current) window.clearInterval(pollRef.current)
+        setFedapayStatus('success')
+      } else if (attempts >= 15) {
+        // ~30s écoulées, le webhook met parfois quelques secondes de plus
+        if (pollRef.current) window.clearInterval(pollRef.current)
+        setFedapayStatus('timeout')
+      }
+    }, 2000)
+  }
+
+  const handleFedaPayPayment = () => {
+    if (!window.FedaPay || !plan || !subscription) return
+
+    const widget = window.FedaPay.init({
+      public_key: FEDAPAY_PUBLIC_KEY,
+      environment: FEDAPAY_ENV,
+      locale: 'fr',
+      transaction: {
+        amount: Math.round(plan.price),
+        description: `Abonnement STOCKAM - ${plan.name}`,
+        custom_metadata: {
+          subscription_id: subscription.id,
+          plan_id: plan.id,
+        },
+      },
+      currency: { iso: 'XOF' },
+      customer: {
+        firstname: RECIPIENT_NAME.split(' ')[0],
+        lastname: RECIPIENT_NAME.split(' ').slice(1).join(' ') || 'Client',
+      },
+      onComplete: ({ transaction }: { transaction: { status: string } }) => {
+        if (transaction.status === 'approved') {
+          pollSubscriptionActivation(plan.id)
+        }
+      },
+    })
+    widget.open()
   }
 
   const handleSubmit = async () => {
@@ -38,7 +119,6 @@ export default function PaymentPage() {
     if (!plan || !subscription) return
     setSubmitting(true)
     try {
-      // Enregistrer la demande de paiement en attente
       await supabase.from('payments').insert({
         subscription_id: subscription.id,
         amount: plan.price,
@@ -62,6 +142,56 @@ export default function PaymentPage() {
           <button onClick={() => navigate('/profile')} className="text-orange-500 mt-2">
             Retour au profil
           </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Écran de vérification / succès FedaPay
+  if (fedapayStatus === 'verifying' || fedapayStatus === 'success' || fedapayStatus === 'timeout') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center space-y-4">
+          {fedapayStatus === 'verifying' && (
+            <>
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
+                <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-900">Vérification du paiement...</h2>
+              <p className="text-slate-500 text-sm">
+                Merci de patienter quelques secondes pendant que nous activons votre abonnement.
+              </p>
+            </>
+          )}
+          {fedapayStatus === 'success' && (
+            <>
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle className="h-8 w-8 text-emerald-500" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-900">Abonnement activé !</h2>
+              <p className="text-slate-500 text-sm">
+                Votre plan <strong>{plan.name}</strong> est maintenant actif. Merci pour votre paiement.
+              </p>
+              <Button className="w-full" onClick={() => navigate('/')}>
+                Retour à l'accueil
+              </Button>
+            </>
+          )}
+          {fedapayStatus === 'timeout' && (
+            <>
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto">
+                <Loader2 className="h-8 w-8 text-amber-500" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-900">Paiement reçu, activation en cours</h2>
+              <p className="text-slate-500 text-sm">
+                Votre paiement a été confirmé par FedaPay. L'activation peut prendre encore quelques instants.
+                Revenez sur cette page dans un moment, ou contactez-nous si le problème persiste.
+              </p>
+              <Button className="w-full" onClick={() => navigate('/')}>
+                Retour à l'accueil
+              </Button>
+            </>
+          )}
         </div>
       </div>
     )
@@ -126,125 +256,167 @@ export default function PaymentPage() {
           {/* Choisir méthode */}
           <div>
             <p className="text-sm font-semibold mb-3">Choisissez votre méthode de paiement</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => setSelectedMethod('fedapay')}
+                className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                  selectedMethod === 'fedapay'
+                    ? 'border-emerald-500 bg-emerald-50'
+                    : 'border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <CreditCard className={`h-5 w-5 ${selectedMethod === 'fedapay' ? 'text-emerald-500' : 'text-slate-400'}`} />
+                <span className={`text-xs font-bold text-center ${selectedMethod === 'fedapay' ? 'text-emerald-600' : 'text-slate-600'}`}>
+                  Paiement en ligne
+                </span>
+              </button>
               <button
                 onClick={() => setSelectedMethod('wave')}
-                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
                   selectedMethod === 'wave'
                     ? 'border-blue-500 bg-blue-50'
                     : 'border-slate-200 hover:border-slate-300'
                 }`}
               >
-                <Smartphone className={`h-6 w-6 ${selectedMethod === 'wave' ? 'text-blue-500' : 'text-slate-400'}`} />
-                <span className={`text-sm font-bold ${selectedMethod === 'wave' ? 'text-blue-600' : 'text-slate-600'}`}>
+                <Smartphone className={`h-5 w-5 ${selectedMethod === 'wave' ? 'text-blue-500' : 'text-slate-400'}`} />
+                <span className={`text-xs font-bold ${selectedMethod === 'wave' ? 'text-blue-600' : 'text-slate-600'}`}>
                   Wave
                 </span>
               </button>
               <button
                 onClick={() => setSelectedMethod('orange')}
-                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
                   selectedMethod === 'orange'
                     ? 'border-orange-500 bg-orange-50'
                     : 'border-slate-200 hover:border-slate-300'
                 }`}
               >
-                <Phone className={`h-6 w-6 ${selectedMethod === 'orange' ? 'text-orange-500' : 'text-slate-400'}`} />
-                <span className={`text-sm font-bold ${selectedMethod === 'orange' ? 'text-orange-600' : 'text-slate-600'}`}>
+                <Phone className={`h-5 w-5 ${selectedMethod === 'orange' ? 'text-orange-500' : 'text-slate-400'}`} />
+                <span className={`text-xs font-bold ${selectedMethod === 'orange' ? 'text-orange-600' : 'text-slate-600'}`}>
                   Orange Money
                 </span>
               </button>
             </div>
           </div>
 
-          {/* Instructions */}
-          <div className="bg-slate-50 rounded-xl p-4 space-y-3">
-            <p className="text-sm font-semibold text-slate-700">
-              📱 Instructions {selectedMethod === 'wave' ? 'Wave' : 'Orange Money'}
-            </p>
-            <ol className="space-y-2 text-sm text-slate-600">
-              <li className="flex gap-2">
-                <span className="font-bold text-orange-500 shrink-0">1.</span>
-                Ouvrez votre application {selectedMethod === 'wave' ? 'Wave' : 'Orange Money'}
-              </li>
-              <li className="flex gap-2">
-                <span className="font-bold text-orange-500 shrink-0">2.</span>
-                Envoyez <strong>{formatCurrency(plan.price)}</strong> au numéro :
-              </li>
-            </ol>
-
-            {/* Numéro à copier */}
-            <div className="bg-white border border-slate-200 rounded-lg px-4 py-3 flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-400">Numéro {selectedMethod === 'wave' ? 'Wave' : 'Orange Money'}</p>
-                <p className="font-bold text-lg text-slate-900">
-                  {selectedMethod === 'wave' ? WAVE_NUMBER : ORANGE_NUMBER}
-                </p>
-                <p className="text-xs text-slate-500">{RECIPIENT_NAME}</p>
-              </div>
-              <button
-                onClick={() => copyToClipboard(selectedMethod === 'wave' ? WAVE_NUMBER : ORANGE_NUMBER)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+          {/* Paiement en ligne FedaPay */}
+          {selectedMethod === 'fedapay' && (
+            <div className="bg-emerald-50 rounded-xl p-4 space-y-4 text-center">
+              <p className="text-sm text-slate-600">
+                Payez instantanément par Orange Money, Moov Money, Wave ou carte bancaire.
+                Votre abonnement est activé automatiquement dès confirmation.
+              </p>
+              <Button
+                className="w-full"
+                onClick={handleFedaPayPayment}
+                disabled={!fedapayReady}
               >
-                <Copy className="h-4 w-4 text-slate-400" />
-              </button>
+                {fedapayReady ? `Payer ${formatCurrency(plan.price)}` : 'Chargement...'}
+              </Button>
             </div>
+          )}
 
-            <ol className="space-y-2 text-sm text-slate-600" start={3}>
-              <li className="flex gap-2">
-                <span className="font-bold text-orange-500 shrink-0">3.</span>
-                Dans le message, écrivez : <strong>STOCKAM {plan.name}</strong>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-bold text-orange-500 shrink-0">4.</span>
-                Notez la <strong>référence de transaction</strong> reçue par SMS
-              </li>
-              <li className="flex gap-2">
-                <span className="font-bold text-orange-500 shrink-0">5.</span>
-                Entrez cette référence ci-dessous
-              </li>
-            </ol>
-          </div>
+          {/* Instructions paiement manuel */}
+          {(selectedMethod === 'wave' || selectedMethod === 'orange') && (
+            <>
+              <div className="bg-slate-50 rounded-xl p-4 space-y-3">
+                <p className="text-sm font-semibold text-slate-700">
+                  📱 Instructions {selectedMethod === 'wave' ? 'Wave' : 'Orange Money'}
+                </p>
+                <ol className="space-y-2 text-sm text-slate-600">
+                  <li className="flex gap-2">
+                    <span className="font-bold text-orange-500 shrink-0">1.</span>
+                    Ouvrez votre application {selectedMethod === 'wave' ? 'Wave' : 'Orange Money'}
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-bold text-orange-500 shrink-0">2.</span>
+                    Envoyez <strong>{formatCurrency(plan.price)}</strong> au numéro :
+                  </li>
+                </ol>
 
-          {/* Référence transaction */}
-          <div>
-            <label className="block text-sm font-semibold mb-2">
-              Référence de transaction *
-            </label>
-            <input
-              type="text"
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-              className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
-              placeholder="Ex: WV240628XXXXXXXX"
-            />
-            <p className="text-xs text-slate-400 mt-1">
-              La référence se trouve dans le SMS de confirmation reçu après le paiement
-            </p>
-          </div>
+                <div className="bg-white border border-slate-200 rounded-lg px-4 py-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-400">Numéro {selectedMethod === 'wave' ? 'Wave' : 'Orange Money'}</p>
+                    <p className="font-bold text-lg text-slate-900">
+                      {selectedMethod === 'wave' ? WAVE_NUMBER : ORANGE_NUMBER}
+                    </p>
+                    <p className="text-xs text-slate-500">{RECIPIENT_NAME}</p>
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(selectedMethod === 'wave' ? WAVE_NUMBER : ORANGE_NUMBER)}
+                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                  >
+                    <Copy className="h-4 w-4 text-slate-400" />
+                  </button>
+                </div>
 
-          <div className="flex gap-2">
+                <ol className="space-y-2 text-sm text-slate-600" start={3}>
+                  <li className="flex gap-2">
+                    <span className="font-bold text-orange-500 shrink-0">3.</span>
+                    Dans le message, écrivez : <strong>STOCKAM {plan.name}</strong>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-bold text-orange-500 shrink-0">4.</span>
+                    Notez la <strong>référence de transaction</strong> reçue par SMS
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-bold text-orange-500 shrink-0">5.</span>
+                    Entrez cette référence ci-dessous
+                  </li>
+                </ol>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-2">
+                  Référence de transaction *
+                </label>
+                <input
+                  type="text"
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                  className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
+                  placeholder="Ex: WV240628XXXXXXXX"
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  La référence se trouve dans le SMS de confirmation reçu après le paiement
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => navigate('/profile')}
+                >
+                  Annuler
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={handleSubmit}
+                  isLoading={submitting}
+                  disabled={!reference.trim()}
+                >
+                  Confirmer le paiement
+                </Button>
+              </div>
+
+              <p className="text-xs text-center text-slate-400">
+                Votre abonnement sera activé dans les 24h après vérification du paiement
+              </p>
+            </>
+          )}
+
+          {selectedMethod === 'fedapay' && (
             <Button
               variant="outline"
-              className="flex-1"
+              className="w-full"
               onClick={() => navigate('/profile')}
             >
               Annuler
             </Button>
-            <Button
-              className="flex-1"
-              onClick={handleSubmit}
-              isLoading={submitting}
-              disabled={!reference.trim()}
-            >
-              Confirmer le paiement
-            </Button>
-          </div>
-
-          <p className="text-xs text-center text-slate-400">
-            Votre abonnement sera activé dans les 24h après vérification du paiement
-          </p>
+          )}
         </div>
       </div>
     </div>
   )
-            }
+}
