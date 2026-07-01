@@ -26,10 +26,12 @@ export default function SetupPage() {
       if (!businessPlan) throw new Error('Plan introuvable')
 
       await createBusiness(
-        { name: businessName, phone: businessPhone, city: businessCity },
-        businessPlan.id
-      )
-      window.location.href = '/'
+  { name: businessName, phone: businessPhone, city: businessCity },
+  businessPlan.id
+)
+// Attendre un peu pour que Supabase mette à jour le profil
+await new Promise(resolve => setTimeout(resolve, 1000))
+window.location.href = '/'
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la création')
     } finally {
