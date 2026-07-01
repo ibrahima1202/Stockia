@@ -4,15 +4,17 @@ import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import type { Sale, JournalEntry, Product } from '@/types'
 
-const STOCKAM_COLOR = [249, 115, 22] as [number, number, number] // orange-500
-const DARK_COLOR = [15, 23, 42] as [number, number, number] // slate-900
+const STOCKAM_COLOR = [249, 115, 22] as [number, number, number]
+const DARK_COLOR = [15, 23, 42] as [number, number, number]
+
+function formatXOF(amount: number): string {
+  return amount.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+}
 
 function addHeader(doc: jsPDF, businessName: string, title: string) {
-  // Fond header
   doc.setFillColor(...DARK_COLOR)
   doc.rect(0, 0, 210, 25, 'F')
 
-  // Logo texte
   doc.setFontSize(16)
   doc.setTextColor(255, 255, 255)
   doc.setFont('helvetica', 'bold')
@@ -21,19 +23,16 @@ function addHeader(doc: jsPDF, businessName: string, title: string) {
   doc.setTextColor(...STOCKAM_COLOR)
   doc.text('AM', 36, 16)
 
-  // Nom commerce
   doc.setFontSize(9)
   doc.setTextColor(148, 163, 184)
   doc.setFont('helvetica', 'normal')
   doc.text(businessName, 14, 21)
 
-  // Titre document
   doc.setFontSize(11)
   doc.setTextColor(255, 255, 255)
   doc.setFont('helvetica', 'bold')
   doc.text(title, 210 - 14, 16, { align: 'right' })
 
-  // Date
   doc.setFontSize(8)
   doc.setTextColor(148, 163, 184)
   doc.setFont('helvetica', 'normal')
@@ -59,14 +58,10 @@ function addFooter(doc: jsPDF) {
 }
 
 export const pdfService = {
-  // ============================================================
-  // REÇU DE VENTE
-  // ============================================================
   exportSaleReceipt(sale: Sale, businessName: string): void {
     const doc = new jsPDF()
     addHeader(doc, businessName, 'REÇU DE VENTE')
 
-    // Infos vente
     doc.setFontSize(10)
     doc.setTextColor(...DARK_COLOR)
     doc.setFont('helvetica', 'bold')
@@ -92,7 +87,6 @@ export const pdfService = {
     const statutLabel = sale.statut === 'paye' ? 'Payé' : sale.statut === 'credit' ? 'À crédit' : 'Partiel'
     doc.text(statutLabel, 50, sale.client ? 56 : 49)
 
-    // Tableau articles
     const startY = sale.client ? 65 : 58
     autoTable(doc, {
       startY,
@@ -100,19 +94,14 @@ export const pdfService = {
       body: (sale.sale_items || []).map((item) => [
         item.product?.name ?? '—',
         item.quantity.toString(),
-        `${item.unit_price.toLocaleString('fr-FR')} XOF`,
-        `${item.total_price.toLocaleString('fr-FR')} XOF`,
+        `${formatXOF(item.unit_price)} XOF`,
+        `${formatXOF(item.total_price)} XOF`,
       ]),
-      headStyles: {
-        fillColor: DARK_COLOR,
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
+      headStyles: { fillColor: DARK_COLOR, textColor: [255, 255, 255], fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       styles: { fontSize: 9 },
     })
 
-    // Total
     const finalY = (doc as any).lastAutoTable.finalY + 8
     doc.setFillColor(249, 250, 251)
     doc.rect(120, finalY - 4, 76, 8, 'F')
@@ -121,14 +110,14 @@ export const pdfService = {
     doc.setTextColor(...DARK_COLOR)
     doc.text('TOTAL :', 125, finalY + 1)
     doc.setTextColor(...STOCKAM_COLOR)
-    doc.text(`${sale.total_amount.toLocaleString('fr-FR')} XOF`, 196, finalY + 1, { align: 'right' })
+    doc.text(`${formatXOF(sale.total_amount)} XOF`, 196, finalY + 1, { align: 'right' })
 
     if (sale.statut === 'partiel') {
       doc.setFontSize(9)
       doc.setTextColor(239, 68, 68)
       doc.setFont('helvetica', 'normal')
       doc.text(
-        `Reste dû : ${(sale.total_amount - (sale.montant_paye ?? 0)).toLocaleString('fr-FR')} XOF`,
+        `Reste dû : ${formatXOF(sale.total_amount - (sale.montant_paye ?? 0))} XOF`,
         196, finalY + 8,
         { align: 'right' }
       )
@@ -138,14 +127,10 @@ export const pdfService = {
     doc.save(`recu-${sale.reference}.pdf`)
   },
 
-  // ============================================================
-  // JOURNAL COMPTABLE
-  // ============================================================
   exportJournal(entries: JournalEntry[], businessName: string, period?: string): void {
     const doc = new jsPDF()
     addHeader(doc, businessName, 'LIVRE JOURNAL')
 
-    // Période
     if (period) {
       doc.setFontSize(9)
       doc.setTextColor(100, 116, 139)
@@ -159,15 +144,11 @@ export const pdfService = {
         format(new Date(e.entry_date), 'dd/MM/yyyy', { locale: fr }),
         e.reference,
         e.label.length > 35 ? e.label.substring(0, 35) + '...' : e.label,
-        e.debit > 0 ? `${e.debit.toLocaleString('fr-FR')}` : '—',
-        e.credit > 0 ? `${e.credit.toLocaleString('fr-FR')}` : '—',
-        `${e.balance.toLocaleString('fr-FR')}`,
+        e.debit > 0 ? formatXOF(e.debit) : '—',
+        e.credit > 0 ? formatXOF(e.credit) : '—',
+        formatXOF(e.balance),
       ]),
-      headStyles: {
-        fillColor: DARK_COLOR,
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
+      headStyles: { fillColor: DARK_COLOR, textColor: [255, 255, 255], fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       styles: { fontSize: 8 },
       columnStyles: {
@@ -177,7 +158,6 @@ export const pdfService = {
       },
     })
 
-    // Totaux
     const totalDebit = entries.reduce((s, e) => s + e.debit, 0)
     const totalCredit = entries.reduce((s, e) => s + e.credit, 0)
     const finalY = (doc as any).lastAutoTable.finalY + 6
@@ -185,16 +165,13 @@ export const pdfService = {
     doc.setFontSize(9)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...DARK_COLOR)
-    doc.text(`Total débits : ${totalDebit.toLocaleString('fr-FR')} XOF`, 14, finalY)
-    doc.text(`Total crédits : ${totalCredit.toLocaleString('fr-FR')} XOF`, 105, finalY)
+    doc.text(`Total débits : ${formatXOF(totalDebit)} XOF`, 14, finalY)
+    doc.text(`Total crédits : ${formatXOF(totalCredit)} XOF`, 105, finalY)
 
     addFooter(doc)
     doc.save(`journal-${format(new Date(), 'yyyy-MM-dd')}.pdf`)
   },
 
-  // ============================================================
-  // RAPPORT DE STOCK
-  // ============================================================
   exportStock(products: Product[], businessName: string): void {
     const doc = new jsPDF()
     addHeader(doc, businessName, 'RAPPORT DE STOCK')
@@ -209,23 +186,18 @@ export const pdfService = {
 
     autoTable(doc, {
       startY: 38,
-      head: [['Référence', 'Produit', 'Catégorie', 'Stock actuel', 'Stock min.', 'Prix achat', 'Valeur stock']],
+      head: [['Référence', 'Produit', 'Catégorie', 'Stock', 'Min.', 'Prix achat', 'Valeur stock']],
       body: products.map((p) => [
         p.reference,
         p.name,
         p.category?.name ?? '—',
         p.stock_current.toString(),
         p.stock_minimum.toString(),
-        `${p.purchase_price.toLocaleString('fr-FR')}`,
-        `${(p.stock_current * p.purchase_price).toLocaleString('fr-FR')}`,
+        formatXOF(p.purchase_price),
+        formatXOF(p.stock_current * p.purchase_price),
       ]),
-      headStyles: {
-        fillColor: DARK_COLOR,
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
+      headStyles: { fillColor: DARK_COLOR, textColor: [255, 255, 255], fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [248, 250, 252] },
-      bodyStyles: { fontSize: 8 },
       styles: { fontSize: 8 },
       columnStyles: {
         3: { halign: 'center' },
@@ -244,7 +216,6 @@ export const pdfService = {
       },
     })
 
-    // Valeur totale stock
     const totalValue = products.reduce((s, p) => s + p.stock_current * p.purchase_price, 0)
     const finalY = (doc as any).lastAutoTable.finalY + 6
     doc.setFontSize(10)
@@ -252,9 +223,9 @@ export const pdfService = {
     doc.setTextColor(...DARK_COLOR)
     doc.text('Valeur totale du stock :', 120, finalY)
     doc.setTextColor(...STOCKAM_COLOR)
-    doc.text(`${totalValue.toLocaleString('fr-FR')} XOF`, 196, finalY, { align: 'right' })
+    doc.text(`${formatXOF(totalValue)} XOF`, 196, finalY, { align: 'right' })
 
     addFooter(doc)
     doc.save(`stock-${format(new Date(), 'yyyy-MM-dd')}.pdf`)
   },
-      }
+             }
