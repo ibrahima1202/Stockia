@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import type { Sale, CreateSalePayload } from '@/types'
 import { generateReference } from '@/lib/utils'
+import { getBusinessId } from '@/lib/business'
 import { format as dateFormat } from 'date-fns'
 
 export const saleService = {
@@ -32,7 +33,6 @@ export const saleService = {
       .gte('created_at', `${today}T00:00:00`)
       .lte('created_at', `${today}T23:59:59`)
     if (error) throw error
-    // Le CA réel = montant effectivement encaissé
     const revenue = (data || []).reduce((sum, s) => {
       if (s.statut === 'credit') return sum
       if (s.statut === 'partiel') return sum + (s.montant_paye ?? 0)
@@ -51,6 +51,7 @@ export const saleService = {
       ? 0
       : (payload.montant_paye ?? 0)
     const montantDu = totalAmount - montantPaye
+    const businessId = getBusinessId()
 
     // 1. Créer la vente
     const { data: sale, error: saleError } = await supabase
@@ -64,6 +65,7 @@ export const saleService = {
         statut,
         montant_paye: montantPaye,
         created_by: userId,
+        business_id: businessId,
       })
       .select()
       .single()
@@ -76,6 +78,7 @@ export const saleService = {
       quantity: item.quantity,
       unit_price: item.unit_price,
       total_price: item.total_price,
+      business_id: businessId,
     }))
     const { error: itemsError } = await supabase.from('sale_items').insert(saleItems)
     if (itemsError) throw itemsError
@@ -105,11 +108,12 @@ export const saleService = {
         reason: `Vente ${reference}`,
         reference,
         created_by: userId,
+        business_id: businessId,
       })
       if (movError) throw movError
     }
 
-    // 4. Journal — uniquement le montant encaissé
+    // 4. Journal
     if (montantPaye > 0) {
       const { error: journalError } = await supabase.from('journal_entries').insert({
         entry_date: dateFormat(new Date(), 'yyyy-MM-dd'),
@@ -119,6 +123,7 @@ export const saleService = {
         credit: 0,
         source_type: 'vente',
         source_id: sale.id,
+        business_id: businessId,
       })
       if (journalError) throw journalError
     }
@@ -138,7 +143,6 @@ export const saleService = {
         .eq('id', payload.client_id)
       if (uError) throw uError
 
-      // Enregistrer dans reglements_clients comme dette
       const { error: rError } = await supabase.from('reglements_clients').insert({
         client_id: payload.client_id,
         sale_id: sale.id,
@@ -147,6 +151,7 @@ export const saleService = {
         notes: `Crédit vente ${reference}`,
         reglement_date: dateFormat(new Date(), 'yyyy-MM-dd'),
         created_by: userId,
+        business_id: businessId,
       })
       if (rError) throw rError
     }
@@ -162,7 +167,6 @@ export const saleService = {
       .single()
     if (fetchError) throw fetchError
 
-    // Restaurer stock
     for (const item of (sale.sale_items || [])) {
       const { data: product, error: pError } = await supabase
         .from('products')
@@ -178,7 +182,6 @@ export const saleService = {
       if (stockError) throw stockError
     }
 
-    // Si crédit/partiel → réduire le solde du client
     if (sale.client_id && sale.statut !== 'paye') {
       const montantDu = sale.total_amount - (sale.montant_paye ?? 0)
       const { data: client, error: cError } = await supabase
@@ -194,11 +197,10 @@ export const saleService = {
       }
     }
 
-    // Supprimer journal, mouvements, vente
     await supabase.from('journal_entries').delete().eq('source_type', 'vente').eq('source_id', id)
     await supabase.from('stock_movements').delete().eq('reference', sale.reference)
     await supabase.from('reglements_clients').delete().eq('sale_id', id)
     const { error } = await supabase.from('sales').delete().eq('id', id)
     if (error) throw error
   },
-}
+  }
