@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import type { StockMovement, StockMovementType } from '@/types'
 import { generateReference } from '@/lib/utils'
+import { getBusinessId } from '@/lib/business'
 
 export const stockService = {
   async getMovements(limit = 100): Promise<StockMovement[]> {
@@ -32,6 +33,7 @@ export const stockService = {
     userId?: string
   ): Promise<StockMovement> {
     const ref = reference || generateReference(type === 'entree' ? 'ENT' : 'SOR')
+    const businessId = getBusinessId()
 
     const { data: product, error: productError } = await supabase
       .from('products')
@@ -53,6 +55,7 @@ export const stockService = {
         reason,
         reference: ref,
         created_by: userId ?? null,
+        business_id: businessId,
       })
       .select('*, product:products(name, reference)')
       .single()
