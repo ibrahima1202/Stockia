@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import type { Client, ReglementClient, PaymentMethod } from '@/types'
 import { generateReference } from '@/lib/utils'
+import { getBusinessId } from '@/lib/business'
 
 export const clientService = {
   async getAll(): Promise<Client[]> {
@@ -28,7 +29,7 @@ export const clientService = {
   ): Promise<Client> {
     const { data, error } = await supabase
       .from('clients')
-      .insert({ ...client, solde: 0, created_by: userId })
+      .insert({ ...client, solde: 0, created_by: userId, business_id: getBusinessId() })
       .select()
       .single()
     if (error) throw error
@@ -72,6 +73,8 @@ export const clientService = {
     saleId: string | null,
     userId: string
   ): Promise<ReglementClient> {
+    const businessId = getBusinessId()
+
     // 1. Enregistrer le règlement
     const { data: reglement, error: rError } = await supabase
       .from('reglements_clients')
@@ -83,6 +86,7 @@ export const clientService = {
         notes,
         reglement_date: new Date().toISOString().split('T')[0],
         created_by: userId,
+        business_id: businessId,
       })
       .select()
       .single()
@@ -112,9 +116,10 @@ export const clientService = {
       credit: 0,
       source_type: 'reglement_client',
       source_id: reglement.id,
+      business_id: businessId,
     })
     if (jError) throw jError
 
     return reglement
   },
-}
+      }
