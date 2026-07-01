@@ -20,6 +20,10 @@ export function useAuth() {
           try {
             const p = await authService.getProfile(session.user.id)
             setProfile(p)
+            // Rediriger vers setup si pas de business_id
+            if (!p.business_id && window.location.pathname !== '/setup') {
+              window.location.href = '/setup'
+            }
           } catch {}
         }
       } catch {}
@@ -38,6 +42,9 @@ export function useAuth() {
           try {
             const p = await authService.getProfile(session.user.id)
             setProfile(p)
+            if (!p.business_id && window.location.pathname !== '/setup') {
+              window.location.href = '/setup'
+            }
           } catch {}
         } else if (event === 'SIGNED_OUT') {
           reset()
@@ -55,7 +62,6 @@ export function useAuth() {
   const signIn = async (email: string, password: string) => {
     try {
       await authService.signIn(email, password)
-      // Rechargement complet pour vider tous les caches React
       window.location.href = '/'
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erreur de connexion'
