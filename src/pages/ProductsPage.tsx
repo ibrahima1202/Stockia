@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Search, Package } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, Package, FileDown, Lock } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   Badge, Modal, EmptyState, Card
@@ -12,7 +12,9 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { useProducts } from '@/hooks/useProducts'
 import { useAuthStore } from '@/store/authStore'
+import { useSubscription } from '@/hooks/useSubscription'
 import { formatCurrency } from '@/lib/utils'
+import { pdfService } from '@/services/pdfService'
 import type { Product } from '@/types'
 
 const productSchema = z.object({
@@ -30,6 +32,7 @@ type ProductForm = z.infer<typeof productSchema>
 export default function ProductsPage() {
   const { products, categories, isLoading, createProduct, updateProduct, deleteProduct } = useProducts()
   const { profile } = useAuthStore()
+  const { canExportPDF, business } = useSubscription()
   const isAdmin = profile?.role === 'admin'
 
   const [search, setSearch] = useState('')
@@ -97,6 +100,10 @@ export default function ProductsPage() {
     }
   }
 
+  const handleExportStock = () => {
+    pdfService.exportStock(filtered, business?.name ?? 'Mon Commerce')
+  }
+
   if (isLoading) return <LoadingScreen text="Chargement des produits..." />
 
   return (
@@ -106,11 +113,25 @@ export default function ProductsPage() {
           <h1 className="page-title">Produits</h1>
           <p className="text-sm text-muted-foreground">{products.length} produit(s)</p>
         </div>
-        {isAdmin && (
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" /> Nouveau produit
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {canExportPDF ? (
+            <Button variant="outline" onClick={handleExportStock} disabled={filtered.length === 0}>
+              <FileDown className="h-4 w-4" /> Rapport PDF
+            </Button>
+          ) : (
+            <button
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-dashed border-slate-300 text-slate-400 text-sm cursor-not-allowed"
+              title="Fonctionnalité Pro"
+            >
+              <Lock className="h-3.5 w-3.5" /> PDF (Pro)
+            </button>
+          )}
+          {isAdmin && (
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4" /> Nouveau produit
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -190,16 +211,10 @@ export default function ProductsPage() {
                     {isAdmin && (
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => openEdit(p)}
-                            className="p-1.5 rounded hover:bg-muted transition-colors"
-                          >
+                          <button onClick={() => openEdit(p)} className="p-1.5 rounded hover:bg-muted transition-colors">
                             <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                           </button>
-                          <button
-                            onClick={() => setDeleteConfirm(p)}
-                            className="p-1.5 rounded hover:bg-red-50 transition-colors"
-                          >
+                          <button onClick={() => setDeleteConfirm(p)} className="p-1.5 rounded hover:bg-red-50 transition-colors">
                             <Trash2 className="h-3.5 w-3.5 text-red-400" />
                           </button>
                         </div>
