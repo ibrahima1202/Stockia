@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import type { Expense, ExpenseCategory } from '@/types'
 import { generateReference } from '@/lib/utils'
+import { getBusinessId } from '@/lib/business'
 import { format } from 'date-fns'
 
 export const expenseService = {
@@ -22,9 +23,11 @@ export const expenseService = {
     },
     userId: string
   ): Promise<Expense> {
+    const businessId = getBusinessId()
+
     const { data, error } = await supabase
       .from('expenses')
-      .insert({ ...expense, created_by: userId })
+      .insert({ ...expense, created_by: userId, business_id: businessId })
       .select()
       .single()
     if (error) throw error
@@ -38,6 +41,7 @@ export const expenseService = {
       credit: expense.amount,
       source_type: 'depense',
       source_id: data.id,
+      business_id: businessId,
     })
     if (journalError) throw journalError
 
