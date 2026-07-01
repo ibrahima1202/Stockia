@@ -11,7 +11,7 @@ import { useToast } from '@/store/toastStore'
 const ADMIN_EMAIL = 'sidibeibrahima408@gmail.com'
 
 export default function AdminPage() {
-  const { user } = useAuthStore()
+  const { user, isLoading: authLoading } = useAuthStore()
   const navigate = useNavigate()
   const toast = useToast()
 
@@ -37,12 +37,17 @@ export default function AdminPage() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (user?.email !== ADMIN_EMAIL) {
+    if (authLoading) return
+    if (!user) {
+      navigate('/login')
+      return
+    }
+    if (user.email !== ADMIN_EMAIL) {
       navigate('/')
       return
     }
     load()
-  }, [user, navigate, load])
+  }, [user, authLoading, navigate, load])
 
   const handleActivate = async (
     subscriptionId: string,
@@ -81,7 +86,8 @@ export default function AdminPage() {
     return <Badge variant="default">{status}</Badge>
   }
 
-  if (isLoading) return <LoadingScreen text="Chargement du dashboard admin..." />
+  if (authLoading || isLoading) return <LoadingScreen text="Chargement du dashboard admin..." />
+  if (!user || user.email !== ADMIN_EMAIL) return null
 
   const pendingPayments = businesses.filter(
     (b) => b.pending_payments && b.pending_payments.length > 0
@@ -154,7 +160,7 @@ export default function AdminPage() {
                   <p className="text-xs text-slate-400">Référence transaction</p>
                   <p className="font-mono font-medium">{payment.reference}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   {plans.map((plan) => (
                     <Button
                       key={plan.id}
