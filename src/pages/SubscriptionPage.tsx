@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Check, Crown, Calendar, ArrowLeft, X, Users, Package, BarChart3, FileText, Headphones } from 'lucide-react'
+import { Check, Crown, Calendar, ArrowLeft, X, Users, Package, BarChart3, Headphones } from 'lucide-react'
 import { Card } from '@/components/ui/index'
 import { Button } from '@/components/ui/button'
 import { useSubscription } from '@/hooks/useSubscription'
