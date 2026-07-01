@@ -15,9 +15,19 @@ export default function ProfilePage() {
   const toast = useToast()
   const navigate = useNavigate()
 
+  // Profil
   const [editingProfile, setEditingProfile] = useState(false)
   const [fullName, setFullName] = useState(profile?.full_name ?? '')
   const [profileSubmitting, setProfileSubmitting] = useState(false)
+
+  // Commerce
+  const [editingBusiness, setEditingBusiness] = useState(false)
+  const [businessName, setBusinessName] = useState(business?.name ?? '')
+  const [businessPhone, setBusinessPhone] = useState(business?.phone ?? '')
+  const [businessCity, setBusinessCity] = useState(business?.city ?? '')
+  const [businessSubmitting, setBusinessSubmitting] = useState(false)
+
+  // Nettoyage
   const [cleanConfirm, setCleanConfirm] = useState(false)
   const [cleanSubmitting, setCleanSubmitting] = useState(false)
 
@@ -33,6 +43,25 @@ export default function ProfilePage() {
       toast.error('Erreur', 'Impossible de mettre à jour le profil')
     } finally {
       setProfileSubmitting(false)
+    }
+  }
+
+  const handleUpdateBusiness = async () => {
+    if (!business || !businessName.trim()) return
+    setBusinessSubmitting(true)
+    try {
+      await subscriptionService.updateBusiness(business.id, {
+        name: businessName,
+        phone: businessPhone,
+        city: businessCity,
+      })
+      toast.success('Commerce mis à jour')
+      setEditingBusiness(false)
+      reload()
+    } catch {
+      toast.error('Erreur', 'Impossible de mettre à jour le commerce')
+    } finally {
+      setBusinessSubmitting(false)
     }
   }
 
@@ -64,7 +93,7 @@ export default function ProfilePage() {
         <p className="text-sm text-muted-foreground">Informations personnelles et abonnement</p>
       </div>
 
-      {/* Abonnement — résumé avec lien */}
+      {/* Abonnement */}
       <Card
         className="p-4 space-y-3 cursor-pointer hover:bg-muted/30 transition-colors"
         onClick={() => navigate('/subscription')}
@@ -110,7 +139,7 @@ export default function ProfilePage() {
         <p className="text-xs text-primary font-medium">Voir tous les plans →</p>
       </Card>
 
-      {/* Infos personnelles — lecture seule */}
+      {/* Infos personnelles */}
       <Card className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -160,11 +189,7 @@ export default function ProfilePage() {
               <p className="text-xs text-muted-foreground mt-1">L'email ne peut pas être modifié</p>
             </div>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => { setEditingProfile(false); setFullName(profile?.full_name ?? '') }}
-              >
+              <Button variant="outline" size="sm" onClick={() => { setEditingProfile(false); setFullName(profile?.full_name ?? '') }}>
                 Annuler
               </Button>
               <Button onClick={handleUpdateProfile} isLoading={profileSubmitting} size="sm">
@@ -178,28 +203,82 @@ export default function ProfilePage() {
       {/* Commerce */}
       {business && (
         <Card className="p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-emerald-500" />
-            <h2 className="font-semibold text-sm">Mon commerce</h2>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between py-1.5 border-b">
-              <span className="text-xs text-muted-foreground">Nom</span>
-              <span className="text-sm font-medium">{business.name}</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-emerald-500" />
+              <h2 className="font-semibold text-sm">Mon commerce</h2>
             </div>
-            {business.phone && (
+            {!editingBusiness && (
+              <button
+                onClick={() => {
+                  setBusinessName(business.name)
+                  setBusinessPhone(business.phone ?? '')
+                  setBusinessCity(business.city ?? '')
+                  setEditingBusiness(true)
+                }}
+                className="p-1.5 hover:bg-emerald-50 rounded text-emerald-500"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {!editingBusiness ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between py-1.5 border-b">
+                <span className="text-xs text-muted-foreground">Nom</span>
+                <span className="text-sm font-medium">{business.name}</span>
+              </div>
               <div className="flex items-center justify-between py-1.5 border-b">
                 <span className="text-xs text-muted-foreground">Téléphone</span>
-                <span className="text-sm">{business.phone}</span>
+                <span className="text-sm">{business.phone || '—'}</span>
               </div>
-            )}
-            {business.city && (
               <div className="flex items-center justify-between py-1.5">
                 <span className="text-xs text-muted-foreground">Ville</span>
-                <span className="text-sm">{business.city}</span>
+                <span className="text-sm">{business.city || '—'}</span>
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Nom du commerce *</label>
+                <input
+                  type="text"
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Téléphone</label>
+                <input
+                  type="tel"
+                  value={businessPhone}
+                  onChange={(e) => setBusinessPhone(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  placeholder="+223 XX XX XX XX"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Ville</label>
+                <input
+                  type="text"
+                  value={businessCity}
+                  onChange={(e) => setBusinessCity(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  placeholder="Kadiolo, Sikasso, Bamako..."
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setEditingBusiness(false)}>
+                  Annuler
+                </Button>
+                <Button onClick={handleUpdateBusiness} isLoading={businessSubmitting} size="sm">
+                  Enregistrer
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
@@ -235,4 +314,4 @@ export default function ProfilePage() {
       </Card>
     </div>
   )
-}
+              }
