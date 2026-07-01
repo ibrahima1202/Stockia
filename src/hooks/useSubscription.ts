@@ -39,7 +39,6 @@ export function useSubscription() {
     setBusiness(biz)
     setSubscription(sub)
 
-    // Mettre à jour le profil dans le store avec le nouveau business_id
     if (user) {
       try {
         const updatedProfile = await authService.getProfile(user.id)
@@ -77,6 +76,8 @@ export function useSubscription() {
     subscription?.plan?.slug === 'business' ||
     subscription?.plan?.slug === 'pro'
 
+  const canExportPDF = subscription?.plan?.slug === 'pro'
+
   const currentPlan = subscription?.plan ?? null
 
   return {
@@ -93,6 +94,7 @@ export function useSubscription() {
     canAddUser,
     canAccessStats,
     canAccessClientsAndFournisseurs,
+    canExportPDF,
     currentPlan,
   }
 }
