@@ -22,12 +22,15 @@ export const useAuthStore = create<AuthState>()(
       setUser: (user) => set({ user }),
       setProfile: (profile) => set({ profile }),
       setLoading: (isLoading) => set({ isLoading }),
-      reset: () => set({ user: null, profile: null, isLoading: false }),
+      reset: () => {
+        // Vider le localStorage pour éviter le cache entre comptes
+        localStorage.removeItem('quincaillerie-auth')
+        set({ user: null, profile: null, isLoading: false })
+      },
     }),
     {
       name: 'quincaillerie-auth',
       partialize: (state) => ({ profile: state.profile }),
-      // CORRIGÉ : isLoading toujours réinitialisé à true au démarrage
       onRehydrateStorage: () => (state) => {
         if (state) state.isLoading = true
       },
