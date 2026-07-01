@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { getBusinessId } from '@/lib/business'
 import type { Product, Category } from '@/types'
 
 export const productService = {
@@ -58,7 +59,7 @@ export const productService = {
   ): Promise<Product> {
     const { data, error } = await supabase
       .from('products')
-      .insert(product)
+      .insert({ ...product, business_id: getBusinessId() })
       .select('*, category:categories(*)')
       .single()
     if (error) throw error
@@ -107,7 +108,7 @@ export const productService = {
   async createCategory(name: string): Promise<Category> {
     const { data, error } = await supabase
       .from('categories')
-      .insert({ name })
+      .insert({ name, business_id: getBusinessId() })
       .select()
       .single()
     if (error) throw error
