@@ -67,15 +67,15 @@ export default function JournalPage() {
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <Card className="p-3 sm:p-4 min-w-0">
           <p className="text-[11px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Entrées</p>
-          <p className="text-base sm:text-xl font-bold text-emerald-600 mt-1 break-words">{formatCurrency(totalDebit)}</p>
+          <p className="text-sm sm:text-xl font-bold text-emerald-600 mt-1 leading-snug">{formatCurrency(totalDebit)}</p>
         </Card>
         <Card className="p-3 sm:p-4 min-w-0">
           <p className="text-[11px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Sorties</p>
-          <p className="text-base sm:text-xl font-bold text-red-500 mt-1 break-words">{formatCurrency(totalCredit)}</p>
+          <p className="text-sm sm:text-xl font-bold text-red-500 mt-1 leading-snug">{formatCurrency(totalCredit)}</p>
         </Card>
         <Card className="p-3 sm:p-4 min-w-0">
           <p className="text-[11px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide">Solde actuel</p>
-          <p className={`text-base sm:text-xl font-bold mt-1 break-words ${lastBalance >= 0 ? 'text-foreground' : 'text-red-600'}`}>
+          <p className={`text-sm sm:text-xl font-bold mt-1 leading-snug ${lastBalance >= 0 ? 'text-foreground' : 'text-red-600'}`}>
             {formatCurrency(lastBalance)}
           </p>
         </Card>
