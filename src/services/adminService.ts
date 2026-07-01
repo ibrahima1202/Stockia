@@ -7,10 +7,6 @@ export interface AdminBusiness {
   city?: string
   owner_id: string
   created_at: string
-  owner?: {
-    email: string
-    full_name: string
-  }
   subscription?: {
     id: string
     status: string
@@ -35,19 +31,36 @@ export interface AdminBusiness {
 
 export const adminService = {
   async getBusinesses(): Promise<AdminBusiness[]> {
-    const { data, error } = await supabase
+    // 1. Récupérer les commerces
+    const { data: businesses, error: bizError } = await supabase
       .from('businesses')
-      .select(`
-        *,
-        subscription:subscriptions(
-          id, status, plan_id, trial_ends_at, current_period_end,
-          plan:plans(id, name, slug, price)
-        ),
-        pending_payments:payments(id, amount, payment_method, reference, created_at)
-      `)
+      .select('*')
       .order('created_at', { ascending: false })
-    if (error) throw error
-    return data
+    if (bizError) throw bizError
+    if (!businesses || businesses.length === 0) return []
+
+    // 2. Récupérer les abonnements avec plans
+    const { data: subscriptions, error: subError } = await supabase
+      .from('subscriptions')
+      .select('*, plan:plans(*)')
+    if (subError) throw subError
+
+    // 3. Récupérer les paiements en attente
+    const { data: payments, error: payError } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('status', 'pending')
+    if (payError) throw payError
+
+    // 4. Assembler les données
+    return businesses.map((biz) => ({
+      ...biz,
+      subscription: subscriptions?.find((s) => s.owner_id === biz.owner_id),
+      pending_payments: payments?.filter((p) => {
+        const sub = subscriptions?.find((s) => s.owner_id === biz.owner_id)
+        return sub && p.subscription_id === sub.id
+      }) ?? [],
+    }))
   },
 
   async activateSubscription(
@@ -58,7 +71,7 @@ export const adminService = {
     const periodEnd = new Date()
     periodEnd.setMonth(periodEnd.getMonth() + 1)
 
-    await supabase
+    const { error } = await supabase
       .from('subscriptions')
       .update({
         status: 'active',
@@ -67,6 +80,7 @@ export const adminService = {
         current_period_end: periodEnd.toISOString(),
       })
       .eq('id', subscriptionId)
+    if (error) throw error
 
     if (paymentId) {
       await supabase
@@ -80,7 +94,7 @@ export const adminService = {
     const periodEnd = new Date()
     periodEnd.setMonth(periodEnd.getMonth() + 1)
 
-    await supabase
+    const { error } = await supabase
       .from('subscriptions')
       .update({
         plan_id: planId,
@@ -88,6 +102,7 @@ export const adminService = {
         current_period_end: periodEnd.toISOString(),
       })
       .eq('id', subscriptionId)
+    if (error) throw error
   },
 
   async getPlans() {
@@ -97,15 +112,5 @@ export const adminService = {
       .order('price')
     if (error) throw error
     return data
-  },
-
-  async getOwnerEmail(userId: string): Promise<string> {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('id', userId)
-      .single()
-    if (error) return 'Inconnu'
-    return data.full_name
   },
 }
