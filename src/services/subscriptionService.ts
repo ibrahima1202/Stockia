@@ -108,12 +108,21 @@ export const subscriptionService = {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Non authentifié')
 
+    // 1. Créer le commerce
     const { data, error } = await supabase
       .from('businesses')
       .insert({ ...payload, owner_id: user.id })
       .select()
       .single()
     if (error) throw error
+
+    // 2. Mettre à jour le business_id dans le profil
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ business_id: data.id })
+      .eq('id', user.id)
+    if (profileError) throw profileError
+
     return data
   },
 
