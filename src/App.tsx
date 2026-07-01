@@ -17,6 +17,7 @@ import SubscriptionPage from '@/pages/SubscriptionPage'
 import StatsPage from '@/pages/StatsPage'
 import TeamPage from '@/pages/TeamPage'
 import AdminPage from '@/pages/AdminPage'
+import SetupPage from '@/pages/SetupPage'
 
 export default function App() {
   return (
@@ -64,6 +65,7 @@ export default function App() {
             }
           />
         </Route>
+        <Route path="/setup" element={<SetupPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
