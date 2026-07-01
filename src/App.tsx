@@ -36,7 +36,7 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/control-panel" element={<AdminPage />} />
           <Route index element={<DashboardPage />} />
           <Route path="products" element={<ProductsPage />} />
           <Route path="stocks" element={<StocksPage />} />
