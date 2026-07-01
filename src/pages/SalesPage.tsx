@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Minus, Trash2, ShoppingCart, Receipt, Pencil, XCircle, User, Lock, Search } from 'lucide-react'
+import { Plus, Minus, Trash2, ShoppingCart, Receipt, Pencil, XCircle, User, Lock, Search, FileDown } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   Badge, EmptyState, Card
@@ -10,9 +10,11 @@ import { useSales } from '@/hooks/useSales'
 import { useProducts } from '@/hooks/useProducts'
 import { useClients } from '@/hooks/useClients'
 import { useReadOnly } from '@/hooks/useReadOnly'
+import { useSubscription } from '@/hooks/useSubscription'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 import type { Sale, SaleCartItem, PaymentMethod, SaleStatut, Product } from '@/types'
 import { useToast } from '@/store/toastStore'
+import { pdfService } from '@/services/pdfService'
 
 export default function SalesPage() {
   const { sales, isLoading, createSale, deleteSale, updateSale } = useSales()
@@ -20,6 +22,7 @@ export default function SalesPage() {
   const { clients } = useClients()
   const toast = useToast()
   const { isReadOnly } = useReadOnly()
+  const { canExportPDF, business } = useSubscription()
 
   const [cart, setCart] = useState<SaleCartItem[]>([])
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('especes')
@@ -31,15 +34,9 @@ export default function SalesPage() {
   const [activeTab, setActiveTab] = useState<'list' | 'new'>('list')
   const [selectedProductId, setSelectedProductId] = useState('')
   const [qty, setQty] = useState(1)
-
-  // Recherche produit
   const [productSearch, setProductSearch] = useState('')
   const [showProductDropdown, setShowProductDropdown] = useState(false)
-
-  // Annulation
   const [cancellingId, setCancellingId] = useState<string | null>(null)
-
-  // Modification
   const [editingSale, setEditingSale] = useState<Sale | null>(null)
   const [editPaymentMethod, setEditPaymentMethod] = useState<PaymentMethod>('especes')
   const [editNotes, setEditNotes] = useState('')
@@ -59,9 +56,7 @@ export default function SalesPage() {
   }, [activeProducts, productSearch])
 
   const selectedProduct = products.find((p) => p.id === selectedProductId)
-
   const cartTotal = cart.reduce((sum, item) => sum + item.total_price, 0)
-
   const montantDu = statut === 'credit'
     ? cartTotal
     : statut === 'partiel'
@@ -91,15 +86,7 @@ export default function SalesPage() {
             : i
         )
       }
-      return [
-        ...prev,
-        {
-          product,
-          quantity: qty,
-          unit_price: product.selling_price,
-          total_price: qty * product.selling_price,
-        },
-      ]
+      return [...prev, { product, quantity: qty, unit_price: product.selling_price, total_price: qty * product.selling_price }]
     })
     setSelectedProductId('')
     setProductSearch('')
@@ -107,17 +94,10 @@ export default function SalesPage() {
   }
 
   const updateQty = (productId: string, newQty: number) => {
-    if (newQty <= 0) {
-      removeFromCart(productId)
-      return
-    }
-    setCart((prev) =>
-      prev.map((i) =>
-        i.product.id === productId
-          ? { ...i, quantity: newQty, total_price: newQty * i.unit_price }
-          : i
-      )
-    )
+    if (newQty <= 0) { removeFromCart(productId); return }
+    setCart((prev) => prev.map((i) =>
+      i.product.id === productId ? { ...i, quantity: newQty, total_price: newQty * i.unit_price } : i
+    ))
   }
 
   const removeFromCart = (productId: string) => {
@@ -143,11 +123,7 @@ export default function SalesPage() {
         notes,
         client_id: selectedClientId || null,
         statut,
-        montant_paye: statut === 'paye'
-          ? cartTotal
-          : statut === 'partiel'
-          ? parseFloat(montantPaye)
-          : 0,
+        montant_paye: statut === 'paye' ? cartTotal : statut === 'partiel' ? parseFloat(montantPaye) : 0,
       })
       setCart([])
       setNotes('')
@@ -184,10 +160,7 @@ export default function SalesPage() {
     if (!editingSale) return
     setEditSubmitting(true)
     try {
-      await updateSale(editingSale.id, {
-        payment_method: editPaymentMethod,
-        notes: editNotes,
-      })
+      await updateSale(editingSale.id, { payment_method: editPaymentMethod, notes: editNotes })
       toast.success('Vente modifiée', 'Les informations ont été mises à jour')
       setEditingSale(null)
     } catch {
@@ -195,6 +168,10 @@ export default function SalesPage() {
     } finally {
       setEditSubmitting(false)
     }
+  }
+
+  const handleExportReceipt = (sale: Sale) => {
+    pdfService.exportSaleReceipt(sale, business?.name ?? 'Mon Commerce')
   }
 
   const getStatutBadge = (sale: Sale) => {
@@ -207,7 +184,6 @@ export default function SalesPage() {
 
   return (
     <div className="space-y-5">
-
       {isReadOnly && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-center gap-2">
           <Lock className="h-4 w-4 text-red-500 shrink-0" />
@@ -298,6 +274,15 @@ export default function SalesPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 justify-end">
+                        {canExportPDF && (
+                          <button
+                            onClick={() => handleExportReceipt(sale)}
+                            className="p-1.5 hover:bg-orange-50 rounded text-orange-500"
+                            title="Télécharger le reçu PDF"
+                          >
+                            <FileDown className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                         <button
                           onClick={() => openEditModal(sale)}
                           disabled={isReadOnly}
@@ -395,7 +380,6 @@ export default function SalesPage() {
                       className="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
                     />
                   </div>
-
                   {showProductDropdown && (
                     <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg max-h-64 overflow-y-auto">
                       {filteredProducts.length === 0 ? (
@@ -417,12 +401,8 @@ export default function SalesPage() {
                       )}
                     </div>
                   )}
-
                   {showProductDropdown && (
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setShowProductDropdown(false)}
-                    />
+                    <div className="fixed inset-0 z-10" onClick={() => setShowProductDropdown(false)} />
                   )}
                 </div>
                 <input
@@ -468,30 +448,18 @@ export default function SalesPage() {
                         <TableCell className="text-right text-sm">{formatCurrency(item.unit_price)}</TableCell>
                         <TableCell>
                           <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => updateQty(item.product.id, item.quantity - 1)}
-                              disabled={isReadOnly}
-                              className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30"
-                            >
+                            <button onClick={() => updateQty(item.product.id, item.quantity - 1)} disabled={isReadOnly} className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30">
                               <Minus className="h-3 w-3" />
                             </button>
                             <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                            <button
-                              onClick={() => updateQty(item.product.id, item.quantity + 1)}
-                              disabled={isReadOnly}
-                              className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30"
-                            >
+                            <button onClick={() => updateQty(item.product.id, item.quantity + 1)} disabled={isReadOnly} className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30">
                               <Plus className="h-3 w-3" />
                             </button>
                           </div>
                         </TableCell>
                         <TableCell className="text-right font-semibold">{formatCurrency(item.total_price)}</TableCell>
                         <TableCell>
-                          <button
-                            onClick={() => removeFromCart(item.product.id)}
-                            disabled={isReadOnly}
-                            className="p-1 hover:bg-red-50 rounded disabled:opacity-30"
-                          >
+                          <button onClick={() => removeFromCart(item.product.id)} disabled={isReadOnly} className="p-1 hover:bg-red-50 rounded disabled:opacity-30">
                             <Trash2 className="h-3.5 w-3.5 text-red-400" />
                           </button>
                         </TableCell>
@@ -506,13 +474,10 @@ export default function SalesPage() {
           <div className="space-y-4">
             <Card className="p-4 space-y-4">
               <h3 className="font-semibold">Récapitulatif</h3>
-
               <div className="flex items-center justify-between py-2 border-t border-b">
                 <span className="text-sm font-medium">Total</span>
                 <span className="text-xl font-bold text-emerald-600">{formatCurrency(cartTotal)}</span>
               </div>
-
-              {/* Client */}
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium">
                   Client <span className="text-muted-foreground font-normal">(optionnel)</span>
@@ -529,8 +494,6 @@ export default function SalesPage() {
                   ))}
                 </select>
               </div>
-
-              {/* Statut paiement */}
               <Select
                 label="Statut du paiement"
                 value={statut}
@@ -544,8 +507,6 @@ export default function SalesPage() {
                   { value: 'partiel', label: '🟡 Paiement partiel' },
                 ]}
               />
-
-              {/* Montant payé si partiel */}
               {statut === 'partiel' && (
                 <div className="space-y-1.5">
                   <label className="block text-sm font-medium">Montant payé (XOF)</label>
@@ -564,8 +525,6 @@ export default function SalesPage() {
                   )}
                 </div>
               )}
-
-              {/* Résumé crédit */}
               {(statut === 'credit' || statut === 'partiel') && selectedClientId && montantDu > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2">
                   <p className="text-xs text-red-600 font-medium">
@@ -574,8 +533,6 @@ export default function SalesPage() {
                   </p>
                 </div>
               )}
-
-              {/* Mode de paiement (si pas 100% crédit) */}
               {statut !== 'credit' && (
                 <Select
                   label="Mode de paiement"
@@ -588,7 +545,6 @@ export default function SalesPage() {
                   ]}
                 />
               )}
-
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium">Notes (optionnel)</label>
                 <textarea
@@ -598,7 +554,6 @@ export default function SalesPage() {
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
               </div>
-
               <Button
                 className="w-full"
                 onClick={handleSubmitSale}
