@@ -41,14 +41,16 @@ export default function JournalPage() {
 
   return (
     <div className="space-y-5">
-      <div className="page-header">
+      <div className="page-header flex-wrap gap-3">
         <div>
           <h1 className="page-title">Livre Journal</h1>
           <p className="text-sm text-muted-foreground">{entries.length} écriture(s)</p>
         </div>
         {canExportPDF ? (
           <Button onClick={handleExportPDF} disabled={entries.length === 0}>
-            <FileDown className="h-4 w-4" /> Exporter PDF
+            <FileDown className="h-4 w-4" />
+            <span className="hidden sm:inline">Exporter PDF</span>
+            <span className="sm:hidden">PDF</span>
           </Button>
         ) : (
           <button
@@ -62,18 +64,18 @@ export default function JournalPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Entrées</p>
-          <p className="text-xl font-bold text-emerald-600 mt-1">{formatCurrency(totalDebit)}</p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <Card className="p-3 sm:p-4 min-w-0">
+          <p className="text-[11px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Entrées</p>
+          <p className="text-base sm:text-xl font-bold text-emerald-600 mt-1 break-words">{formatCurrency(totalDebit)}</p>
         </Card>
-        <Card className="p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Sorties</p>
-          <p className="text-xl font-bold text-red-500 mt-1">{formatCurrency(totalCredit)}</p>
+        <Card className="p-3 sm:p-4 min-w-0">
+          <p className="text-[11px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Sorties</p>
+          <p className="text-base sm:text-xl font-bold text-red-500 mt-1 break-words">{formatCurrency(totalCredit)}</p>
         </Card>
-        <Card className="p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Solde actuel</p>
-          <p className={`text-xl font-bold mt-1 ${lastBalance >= 0 ? 'text-foreground' : 'text-red-600'}`}>
+        <Card className="p-3 sm:p-4 min-w-0">
+          <p className="text-[11px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide">Solde actuel</p>
+          <p className={`text-base sm:text-xl font-bold mt-1 break-words ${lastBalance >= 0 ? 'text-foreground' : 'text-red-600'}`}>
             {formatCurrency(lastBalance)}
           </p>
         </Card>
