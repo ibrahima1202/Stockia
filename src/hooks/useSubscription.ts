@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { subscriptionService } from '@/services/subscriptionService'
+import { useAuthStore } from '@/store/authStore'
+import { authService } from '@/services/authService'
 import type { Subscription, Plan, Business } from '@/types'
 
 export function useSubscription() {
@@ -7,6 +9,7 @@ export function useSubscription() {
   const [business, setBusiness] = useState<Business | null>(null)
   const [plans, setPlans] = useState<Plan[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const { user, setProfile } = useAuthStore()
 
   const load = useCallback(async () => {
     try {
@@ -35,6 +38,15 @@ export function useSubscription() {
     const sub = await subscriptionService.createSubscription(planId)
     setBusiness(biz)
     setSubscription(sub)
+
+    // Mettre à jour le profil dans le store avec le nouveau business_id
+    if (user) {
+      try {
+        const updatedProfile = await authService.getProfile(user.id)
+        setProfile(updatedProfile)
+      } catch {}
+    }
+
     return { biz, sub }
   }
 
@@ -59,12 +71,11 @@ export function useSubscription() {
   const canAddUser = (currentCount: number) =>
     subscription ? subscriptionService.canAddUser(subscription, currentCount) : false
 
-  // Statistiques réservées au plan Pro
   const canAccessStats = subscription?.plan?.slug === 'pro'
 
-const canAccessClientsAndFournisseurs =
-  subscription?.plan?.slug === 'business' ||
-  subscription?.plan?.slug === 'pro'
+  const canAccessClientsAndFournisseurs =
+    subscription?.plan?.slug === 'business' ||
+    subscription?.plan?.slug === 'pro'
 
   const currentPlan = subscription?.plan ?? null
 
