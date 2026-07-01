@@ -1,13 +1,15 @@
 import { useState } from 'react'
-import { BookOpen } from 'lucide-react'
+import { BookOpen, FileDown, Lock } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   Badge, EmptyState, Card
 } from '@/components/ui/index'
 import { Button } from '@/components/ui/button'
 import { useJournal } from '@/hooks/useJournal'
+import { useSubscription } from '@/hooks/useSubscription'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
+import { pdfService } from '@/services/pdfService'
 
 const sourceLabels: Record<string, { label: string; variant: 'success' | 'danger' | 'info' }> = {
   vente: { label: 'Vente', variant: 'success' },
@@ -20,6 +22,7 @@ export default function JournalPage() {
   const [dateFrom, setDateFrom] = useState(format(startOfMonth(today), 'yyyy-MM-dd'))
   const [dateTo, setDateTo] = useState(format(endOfMonth(today), 'yyyy-MM-dd'))
   const { entries, isLoading, reload } = useJournal()
+  const { canExportPDF, business } = useSubscription()
 
   const totalDebit = entries.reduce((s, e) => s + e.debit, 0)
   const totalCredit = entries.reduce((s, e) => s + e.credit, 0)
@@ -27,6 +30,11 @@ export default function JournalPage() {
 
   const handleFilter = () => {
     reload(dateFrom, dateTo)
+  }
+
+  const handleExportPDF = () => {
+    const period = `${dateFrom} au ${dateTo}`
+    pdfService.exportJournal(entries, business?.name ?? 'Mon Commerce', period)
   }
 
   if (isLoading) return <LoadingScreen text="Chargement du journal..." />
@@ -38,6 +46,19 @@ export default function JournalPage() {
           <h1 className="page-title">Livre Journal</h1>
           <p className="text-sm text-muted-foreground">{entries.length} écriture(s)</p>
         </div>
+        {canExportPDF ? (
+          <Button onClick={handleExportPDF} disabled={entries.length === 0}>
+            <FileDown className="h-4 w-4" /> Exporter PDF
+          </Button>
+        ) : (
+          <button
+            onClick={() => {}}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-dashed border-slate-300 text-slate-400 text-sm cursor-not-allowed"
+            title="Fonctionnalité Pro"
+          >
+            <Lock className="h-3.5 w-3.5" /> PDF (Pro)
+          </button>
+        )}
       </div>
 
       {/* Summary cards */}
@@ -143,7 +164,6 @@ export default function JournalPage() {
                 )
               })}
             </TableBody>
-            {/* Totals row */}
             <tfoot>
               <tr className="bg-muted/50 font-semibold text-sm border-t-2">
                 <td colSpan={4} className="px-3 py-2.5 text-right text-muted-foreground">Totaux période</td>
