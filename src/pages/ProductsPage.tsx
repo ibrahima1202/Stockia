@@ -108,27 +108,36 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="page-header">
+      <div className="page-header flex-wrap gap-3">
         <div>
           <h1 className="page-title">Produits</h1>
           <p className="text-sm text-muted-foreground">{products.length} produit(s)</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {canExportPDF ? (
-            <Button variant="outline" onClick={handleExportStock} disabled={filtered.length === 0}>
-              <FileDown className="h-4 w-4" /> Rapport PDF
+            <Button
+              variant="outline"
+              onClick={handleExportStock}
+              disabled={filtered.length === 0}
+              title="Rapport PDF"
+            >
+              <FileDown className="h-4 w-4" />
+              <span className="hidden sm:inline">Rapport PDF</span>
             </Button>
           ) : (
             <button
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-dashed border-slate-300 text-slate-400 text-sm cursor-not-allowed"
               title="Fonctionnalité Pro"
             >
-              <Lock className="h-3.5 w-3.5" /> PDF (Pro)
+              <Lock className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">PDF (Pro)</span>
             </button>
           )}
           {isAdmin && (
             <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" /> Nouveau produit
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Nouveau produit</span>
+              <span className="sm:hidden">Nouveau</span>
             </Button>
           )}
         </div>
@@ -296,4 +305,4 @@ export default function ProductsPage() {
       </Modal>
     </div>
   )
-}
+  }
