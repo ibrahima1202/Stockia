@@ -2,14 +2,15 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CheckCircle, Copy, Phone, Smartphone, CreditCard, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { LoadingScreen } from '@/components/ui/index'
 import { useSubscription } from '@/hooks/useSubscription'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { useToast } from '@/store/toastStore'
 
-const WAVE_NUMBER = '+223 79740816'
-const ORANGE_NUMBER = '+223 79740816'
-const RECIPIENT_NAME = 'Ibrahim'
+const WAVE_NUMBER = '79740816'
+const ORANGE_NUMBER = '79740816'
+const RECIPIENT_NAME = 'Ibrahima Sidibé'
 
 const FEDAPAY_PUBLIC_KEY = import.meta.env.VITE_FEDAPAY_PUBLIC_KEY as string
 const FEDAPAY_ENV = (import.meta.env.VITE_FEDAPAY_ENV as string) || 'sandbox'
@@ -23,7 +24,7 @@ declare global {
 export default function PaymentPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { plans, subscription } = useSubscription()
+  const { plans, subscription, isLoading: subLoading } = useSubscription()
   const toast = useToast()
 
   const planId = searchParams.get('plan')
@@ -102,9 +103,16 @@ export default function PaymentPage() {
         firstname: RECIPIENT_NAME.split(' ')[0],
         lastname: RECIPIENT_NAME.split(' ').slice(1).join(' ') || 'Client',
       },
-      onComplete: ({ transaction }: { transaction: { status: string } }) => {
-        if (transaction.status === 'approved') {
+      onComplete: ({ transaction }: { transaction?: { status: string } }) => {
+        // Le paiement mobile money est asynchrone : au moment où le widget
+        // se ferme, la transaction peut être encore "pending" (le vrai
+        // statut "approved" arrive quelques secondes plus tard via webhook).
+        // On lance donc la vérification sauf si c'est explicitement un échec.
+        const status = transaction?.status
+        if (status && status !== 'declined' && status !== 'canceled') {
           pollSubscriptionActivation(plan.id)
+        } else if (status === 'declined' || status === 'canceled') {
+          toast.error('Paiement échoué', 'La transaction a été refusée ou annulée.')
         }
       },
     })
@@ -132,6 +140,12 @@ export default function PaymentPage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // Attendre que les plans/abonnement soient chargés avant de décider
+  // si le plan demandé existe ou non (évite le flash "Plan introuvable")
+  if (subLoading) {
+    return <LoadingScreen text="Chargement..." />
   }
 
   if (!plan) {
