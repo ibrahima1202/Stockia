@@ -8,8 +8,8 @@ import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { useToast } from '@/store/toastStore'
 
-const WAVE_NUMBER = '79740816'
-const ORANGE_NUMBER = '79740816'
+const WAVE_NUMBER = '+223 92347783'
+const ORANGE_NUMBER = '+223 92347783'
 const RECIPIENT_NAME = 'Ibrahima Sidibé'
 
 const FEDAPAY_PUBLIC_KEY = import.meta.env.VITE_FEDAPAY_PUBLIC_KEY as string
