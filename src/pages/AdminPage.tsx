@@ -52,12 +52,13 @@ export default function AdminPage() {
   const handleActivate = async (
     subscriptionId: string,
     planId: string,
-    paymentId?: string
+    paymentId?: string,
+    durationMonths: number = 1
   ) => {
     setActivating(subscriptionId)
     try {
-      await adminService.activateSubscription(subscriptionId, planId, paymentId)
-      toast.success('Abonnement activé !')
+      await adminService.activateSubscription(subscriptionId, planId, paymentId, durationMonths)
+      toast.success('Abonnement activé !', durationMonths > 1 ? `Activé pour ${durationMonths} mois` : undefined)
       await load()
     } catch {
       toast.error('Erreur', 'Impossible d\'activer l\'abonnement')
@@ -153,7 +154,12 @@ export default function AdminPage() {
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-orange-400">{formatCurrency(payment.amount)}</p>
-                    <p className="text-xs text-slate-400 capitalize">{payment.payment_method.replace('_', ' ')}</p>
+                    <p className="text-xs text-slate-400 capitalize">
+                      {payment.payment_method.replace('_', ' ')}
+                      {payment.duration_months > 1 && (
+                        <span className="ml-1 text-emerald-400 font-semibold">· {payment.duration_months} mois</span>
+                      )}
+                    </p>
                   </div>
                 </div>
                 <div className="bg-slate-800 rounded-lg px-3 py-2">
@@ -169,7 +175,7 @@ export default function AdminPage() {
                         ? 'bg-emerald-500 hover:bg-emerald-600'
                         : 'bg-slate-700 hover:bg-slate-600'
                       }
-                      onClick={() => biz.subscription && handleActivate(biz.subscription.id, plan.id, payment.id)}
+                      onClick={() => biz.subscription && handleActivate(biz.subscription.id, plan.id, payment.id, payment.duration_months)}
                       isLoading={activating === biz.subscription?.id}
                     >
                       <CheckCircle className="h-3 w-3 mr-1" />
