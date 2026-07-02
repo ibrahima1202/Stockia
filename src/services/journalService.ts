@@ -30,9 +30,8 @@ export const journalService = {
       .order('entry_date', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(1)
-      .maybeSingle()
     if (error) return 0
-    return data?.balance ?? 0
+    return data?.[0]?.balance ?? 0
   },
   async getTodaySummary(): Promise<{ total_debit: number; total_credit: number }> {
     const today = format(new Date(), 'yyyy-MM-dd')
