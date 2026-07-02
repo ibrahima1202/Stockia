@@ -14,7 +14,7 @@ import type { Client, PaymentMethod } from '@/types'
 
 export default function ClientsPage() {
   const { clients, isLoading, createClient, updateClient, deleteClient, addReglement } = useClients()
-  const { canAccessClientsAndFournisseurs } = useSubscription()
+  const { canAccessClientsAndFournisseurs, isLoading: subLoading } = useSubscription()
   const navigate = useNavigate()
 
   // Modal création/édition
@@ -89,7 +89,7 @@ export default function ClientsPage() {
 
   const totalCredit = clients.reduce((sum, c) => sum + c.solde, 0)
 
-  if (isLoading) return <LoadingScreen text="Chargement des clients..." />
+  if (isLoading || subLoading) return <LoadingScreen text="Chargement des clients..." />
 
   // Blocage plan Starter
   if (!canAccessClientsAndFournisseurs) {
