@@ -26,6 +26,7 @@ export interface AdminBusiness {
     payment_method: string
     reference: string
     created_at: string
+    duration_months: number
   }[]
 }
 
@@ -66,10 +67,11 @@ export const adminService = {
   async activateSubscription(
     subscriptionId: string,
     planId: string,
-    paymentId?: string
+    paymentId?: string,
+    durationMonths: number = 1
   ): Promise<void> {
     const periodEnd = new Date()
-    periodEnd.setMonth(periodEnd.getMonth() + 1)
+    periodEnd.setMonth(periodEnd.getMonth() + durationMonths)
 
     const { error } = await supabase
       .from('subscriptions')
