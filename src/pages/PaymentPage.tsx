@@ -8,9 +8,9 @@ import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { useToast } from '@/store/toastStore'
 
-const WAVE_NUMBER = '+223 92347783'
-const ORANGE_NUMBER = '+223 92347783'
-const RECIPIENT_NAME = 'Sadou Sidibé'
+const WAVE_NUMBER = '79740816'
+const ORANGE_NUMBER = '79740816'
+const RECIPIENT_NAME = 'Ibrahima Sidibé'
 
 const FEDAPAY_PUBLIC_KEY = import.meta.env.VITE_FEDAPAY_PUBLIC_KEY as string
 const FEDAPAY_ENV = (import.meta.env.VITE_FEDAPAY_ENV as string) || 'sandbox'
@@ -28,7 +28,12 @@ export default function PaymentPage() {
   const toast = useToast()
 
   const planId = searchParams.get('plan')
+  const durationParam = searchParams.get('duration') === 'annual' ? 'annual' : 'monthly'
+  const isAnnual = durationParam === 'annual'
+  const durationMonths = isAnnual ? 12 : 1
+
   const plan = plans.find((p) => p.id === planId)
+  const amount = plan ? (isAnnual ? plan.price * 10 : plan.price) : 0
 
   const [selectedMethod, setSelectedMethod] = useState<'wave' | 'orange' | 'fedapay'>('fedapay')
   const [reference, setReference] = useState('')
@@ -76,7 +81,6 @@ export default function PaymentPage() {
         if (pollRef.current) window.clearInterval(pollRef.current)
         setFedapayStatus('success')
       } else if (attempts >= 15) {
-        // ~30s écoulées, le webhook met parfois quelques secondes de plus
         if (pollRef.current) window.clearInterval(pollRef.current)
         setFedapayStatus('timeout')
       }
@@ -91,11 +95,12 @@ export default function PaymentPage() {
       environment: FEDAPAY_ENV,
       locale: 'fr',
       transaction: {
-        amount: Math.round(plan.price),
-        description: `Abonnement STOCKAM - ${plan.name}`,
+        amount: Math.round(amount),
+        description: `Abonnement STOCKAM - ${plan.name} (${isAnnual ? 'Annuel' : 'Mensuel'})`,
         custom_metadata: {
           subscription_id: subscription.id,
           plan_id: plan.id,
+          duration_months: durationMonths,
         },
       },
       currency: { iso: 'XOF' },
@@ -104,10 +109,6 @@ export default function PaymentPage() {
         lastname: RECIPIENT_NAME.split(' ').slice(1).join(' ') || 'Client',
       },
       onComplete: ({ transaction }: { transaction?: { status: string } }) => {
-        // Le paiement mobile money est asynchrone : au moment où le widget
-        // se ferme, la transaction peut être encore "pending" (le vrai
-        // statut "approved" arrive quelques secondes plus tard via webhook).
-        // On lance donc la vérification sauf si c'est explicitement un échec.
         const status = transaction?.status
         if (status && status !== 'declined' && status !== 'canceled') {
           pollSubscriptionActivation(plan.id)
@@ -129,10 +130,11 @@ export default function PaymentPage() {
     try {
       await supabase.from('payments').insert({
         subscription_id: subscription.id,
-        amount: plan.price,
+        amount: amount,
         payment_method: selectedMethod === 'wave' ? 'wave' : 'orange_money',
         status: 'pending',
         reference: reference.trim(),
+        duration_months: durationMonths,
       })
       setSubmitted(true)
     } catch {
@@ -142,8 +144,6 @@ export default function PaymentPage() {
     }
   }
 
-  // Attendre que les plans/abonnement soient chargés avant de décider
-  // si le plan demandé existe ou non (évite le flash "Plan introuvable")
   if (subLoading) {
     return <LoadingScreen text="Chargement..." />
   }
@@ -161,7 +161,6 @@ export default function PaymentPage() {
     )
   }
 
-  // Écran de vérification / succès FedaPay
   if (fedapayStatus === 'verifying' || fedapayStatus === 'success' || fedapayStatus === 'timeout') {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center px-4">
@@ -184,7 +183,7 @@ export default function PaymentPage() {
               </div>
               <h2 className="text-xl font-bold text-slate-900">Abonnement activé !</h2>
               <p className="text-slate-500 text-sm">
-                Votre plan <strong>{plan.name}</strong> est maintenant actif. Merci pour votre paiement.
+                Votre plan <strong>{plan.name}</strong> ({isAnnual ? 'annuel' : 'mensuel'}) est maintenant actif. Merci pour votre paiement.
               </p>
               <Button className="w-full" onClick={() => navigate('/')}>
                 Retour à l'accueil
@@ -258,10 +257,17 @@ export default function PaymentPage() {
 
         {/* Header */}
         <div className="bg-slate-900 px-6 py-4">
-          <p className="text-slate-400 text-xs uppercase tracking-wide">Abonnement</p>
+          <div className="flex items-center justify-between">
+            <p className="text-slate-400 text-xs uppercase tracking-wide">Abonnement</p>
+            {isAnnual && (
+              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-full">
+                2 mois offerts
+              </span>
+            )}
+          </div>
           <div className="flex items-center justify-between mt-1">
-            <p className="text-white font-bold text-lg">{plan.name}</p>
-            <p className="text-orange-500 font-bold text-xl">{formatCurrency(plan.price)}<span className="text-slate-400 text-sm font-normal">/mois</span></p>
+            <p className="text-white font-bold text-lg">{plan.name} <span className="text-slate-400 text-sm font-normal">({isAnnual ? 'Annuel' : 'Mensuel'})</span></p>
+            <p className="text-orange-500 font-bold text-xl">{formatCurrency(amount)}<span className="text-slate-400 text-sm font-normal">{isAnnual ? '/an' : '/mois'}</span></p>
           </div>
         </div>
 
@@ -325,7 +331,7 @@ export default function PaymentPage() {
                 onClick={handleFedaPayPayment}
                 disabled={!fedapayReady}
               >
-                {fedapayReady ? `Payer ${formatCurrency(plan.price)}` : 'Chargement...'}
+                {fedapayReady ? `Payer ${formatCurrency(amount)}` : 'Chargement...'}
               </Button>
             </div>
           )}
@@ -344,7 +350,7 @@ export default function PaymentPage() {
                   </li>
                   <li className="flex gap-2">
                     <span className="font-bold text-orange-500 shrink-0">2.</span>
-                    Envoyez <strong>{formatCurrency(plan.price)}</strong> au numéro :
+                    Envoyez <strong>{formatCurrency(amount)}</strong> au numéro :
                   </li>
                 </ol>
 
@@ -367,7 +373,7 @@ export default function PaymentPage() {
                 <ol className="space-y-2 text-sm text-slate-600" start={3}>
                   <li className="flex gap-2">
                     <span className="font-bold text-orange-500 shrink-0">3.</span>
-                    Dans le message, écrivez : <strong>STOCKAM {plan.name}</strong>
+                    Dans le message, écrivez : <strong>STOCKAM {plan.name} {isAnnual ? 'Annuel' : ''}</strong>
                   </li>
                   <li className="flex gap-2">
                     <span className="font-bold text-orange-500 shrink-0">4.</span>
