@@ -23,7 +23,7 @@ export default function FournisseursPage() {
   } = useFournisseurs()
   const { products, reload: reloadProducts } = useProducts()
   const { categories, createCategory } = useCategories()
-  const { canAccessClientsAndFournisseurs } = useSubscription()
+  const { canAccessClientsAndFournisseurs, isLoading: subLoading } = useSubscription()
 const navigate = useNavigate()
 
 
@@ -232,7 +232,7 @@ const navigate = useNavigate()
 
   const totalDettes = fournisseurs.reduce((sum, f) => sum + f.solde, 0)
 
-  if (isLoading) return <LoadingScreen text="Chargement des fournisseurs..." />
+  if (isLoading || subLoading) return <LoadingScreen text="Chargement des fournisseurs..." />
 
   if (!canAccessClientsAndFournisseurs) {
   return (
