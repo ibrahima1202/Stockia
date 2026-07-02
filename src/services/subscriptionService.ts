@@ -23,8 +23,13 @@ export const subscriptionService = {
       .from('subscriptions')
       .select('*, plan:plans(*)')
       .eq('owner_id', (await supabase.auth.getUser()).data.user?.id ?? '')
-      .single()
-    if (error) return null
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (error) {
+      console.error('getMySubscription error:', error)
+      return null
+    }
     return data
   },
 
