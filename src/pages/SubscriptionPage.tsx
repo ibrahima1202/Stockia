@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, Crown, Calendar, ArrowLeft, X, Users, Package, BarChart3, Headphones } from 'lucide-react'
 import { Card } from '@/components/ui/index'
@@ -75,6 +76,7 @@ const colorMap = {
 export default function SubscriptionPage() {
   const navigate = useNavigate()
   const { subscription, plans } = useSubscription()
+  const [isAnnual, setIsAnnual] = useState(false)
 
   const daysLeft = subscription ? subscriptionService.getDaysLeftInTrial(subscription) : 0
   const isTrialing = subscription?.status === 'trial'
@@ -131,6 +133,31 @@ export default function SubscriptionPage() {
         </Card>
       )}
 
+      {/* Toggle Mensuel / Annuel */}
+      <div className="flex items-center justify-center gap-3">
+        <span className={`text-sm font-medium ${!isAnnual ? 'text-slate-900' : 'text-slate-400'}`}>
+          Mensuel
+        </span>
+        <button
+          onClick={() => setIsAnnual(!isAnnual)}
+          className={`relative w-14 h-7 rounded-full transition-colors ${
+            isAnnual ? 'bg-emerald-500' : 'bg-slate-300'
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${
+              isAnnual ? 'translate-x-7' : 'translate-x-0'
+            }`}
+          />
+        </button>
+        <span className={`text-sm font-medium flex items-center gap-1.5 ${isAnnual ? 'text-slate-900' : 'text-slate-400'}`}>
+          Annuel
+          <span className="text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+            2 mois offerts
+          </span>
+        </span>
+      </div>
+
       {/* Cartes des plans */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {plans.map((plan) => {
@@ -140,6 +167,10 @@ export default function SubscriptionPage() {
           const detail = PLAN_DETAILS[plan.slug as keyof typeof PLAN_DETAILS]
           const colors = colorMap[detail?.color as keyof typeof colorMap] ?? colorMap.orange
           const PlanIcon = detail?.icon ?? Package
+
+          const annualPrice = plan.price * 10
+          const monthlyEquivalent = Math.round(annualPrice / 12)
+          const displayedPrice = isAnnual ? annualPrice : plan.price
 
           return (
             <div
@@ -181,10 +212,16 @@ export default function SubscriptionPage() {
                   <p className="text-xs text-slate-500 mb-3">{detail.description}</p>
                 )}
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-bold text-slate-900">{formatCurrency(plan.price)}</span>
-                  <span className="text-sm text-slate-400">/mois</span>
+                  <span className="text-3xl font-bold text-slate-900">{formatCurrency(displayedPrice)}</span>
+                  <span className="text-sm text-slate-400">{isAnnual ? '/an' : '/mois'}</span>
                 </div>
-                <p className="text-xs text-emerald-600 font-medium mt-1">14 jours gratuits</p>
+                {isAnnual ? (
+                  <p className="text-xs text-emerald-600 font-medium mt-1">
+                    Soit {formatCurrency(monthlyEquivalent)}/mois — 2 mois offerts
+                  </p>
+                ) : (
+                  <p className="text-xs text-emerald-600 font-medium mt-1">14 jours gratuits</p>
+                )}
               </div>
 
               {/* Détail des fonctionnalités */}
@@ -226,7 +263,7 @@ export default function SubscriptionPage() {
               ) : (
                 <button
                   className={`w-full py-2.5 rounded-lg text-sm font-semibold text-white transition-colors ${colors.button}`}
-                  onClick={() => navigate(`/payment?plan=${plan.id}`)}
+                  onClick={() => navigate(`/payment?plan=${plan.id}&duration=${isAnnual ? 'annual' : 'monthly'}`)}
                 >
                   Choisir ce plan →
                 </button>
@@ -255,4 +292,4 @@ export default function SubscriptionPage() {
       </p>
     </div>
   )
-                      }
+}
