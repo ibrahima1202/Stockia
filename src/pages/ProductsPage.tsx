@@ -19,7 +19,7 @@ import type { Product } from '@/types'
 const productSchema = z.object({
   name: z.string().min(2, 'Nom requis'),
   reference: z.string().min(1, 'Référence requise'),
-  category_id: z.string().nullable().optional(),
+  category_id: z.string().optional().nullable().transform(v => v === '' ? null : v),
   purchase_price: z.coerce.number().min(0, 'Prix invalide'),
   selling_price: z.coerce.number().min(0, 'Prix invalide'),
   stock_current: z.coerce.number().int().min(0, 'Stock invalide'),
@@ -87,7 +87,7 @@ export default function ProductsPage() {
     reset({
       name: product.name,
       reference: product.reference,
-      category_id: product.category_id ?? undefined,
+      category_id: product.category_id ?? null,
       purchase_price: product.purchase_price,
       selling_price: product.selling_price,
       stock_current: product.stock_current,
@@ -100,7 +100,10 @@ export default function ProductsPage() {
   const onSubmit = async (data: ProductForm) => {
     setSubmitting(true)
     try {
-      const payload = { ...data, category_id: selectedCategoryId || null }
+      const payload = {
+        ...data,
+        category_id: selectedCategoryId || null,
+      }
       if (editProduct) {
         await updateProduct(editProduct.id, payload)
       } else {
@@ -283,7 +286,6 @@ export default function ProductsPage() {
                 </button>
               </div>
 
-              {/* Formulaire nouvelle catégorie */}
               {showNewCategory && (
                 <div className="flex gap-2 mb-2">
                   <input
@@ -317,7 +319,7 @@ export default function ProductsPage() {
                 value={selectedCategoryId}
                 onChange={(e) => {
                   setSelectedCategoryId(e.target.value)
-                  setValue('category_id', e.target.value)
+                  setValue('category_id', e.target.value || null)
                 }}
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
@@ -377,4 +379,4 @@ export default function ProductsPage() {
       </Modal>
     </div>
   )
-}
+                        }
