@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Minus, Trash2, ShoppingCart, Receipt, Pencil, XCircle, User, Lock, Search, FileDown } from 'lucide-react'
+import { Plus, Minus, Trash2, ShoppingCart, Receipt, Pencil, XCircle, User, Lock, Search, FileDown, Tag, UserPlus } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   Badge, EmptyState, Card
@@ -12,18 +12,19 @@ import { useClients } from '@/hooks/useClients'
 import { useReadOnly } from '@/hooks/useReadOnly'
 import { useSubscription } from '@/hooks/useSubscription'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
-import type { Sale, SaleCartItem, PaymentMethod, SaleStatut, Product } from '@/types'
+import type { Sale, SaleCartItem, PaymentMethod, SaleStatut, Product, DiscountType } from '@/types'
 import { useToast } from '@/store/toastStore'
 import { pdfService } from '@/services/pdfService'
 
 export default function SalesPage() {
   const { sales, isLoading, createSale, deleteSale, updateSale } = useSales()
   const { products } = useProducts()
-  const { clients } = useClients()
+  const { clients, createClient } = useClients()
   const toast = useToast()
   const { isReadOnly } = useReadOnly()
   const { canExportPDF, business } = useSubscription()
 
+  // Panier
   const [cart, setCart] = useState<SaleCartItem[]>([])
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('especes')
   const [statut, setStatut] = useState<SaleStatut>('paye')
@@ -36,6 +37,23 @@ export default function SalesPage() {
   const [qty, setQty] = useState(1)
   const [productSearch, setProductSearch] = useState('')
   const [showProductDropdown, setShowProductDropdown] = useState(false)
+
+  // Remise facture
+  const [discountType, setDiscountType] = useState<DiscountType>('amount')
+  const [discountValue, setDiscountValue] = useState('')
+  const [showDiscount, setShowDiscount] = useState(false)
+
+  // Remise produit
+  const [editingDiscountId, setEditingDiscountId] = useState<string | null>(null)
+  const [productDiscountValue, setProductDiscountValue] = useState('')
+
+  // Ajout client rapide
+  const [showNewClient, setShowNewClient] = useState(false)
+  const [newClientName, setNewClientName] = useState('')
+  const [newClientPhone, setNewClientPhone] = useState('')
+  const [newClientSubmitting, setNewClientSubmitting] = useState(false)
+
+  // Annulation & édition
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [editingSale, setEditingSale] = useState<Sale | null>(null)
   const [editPaymentMethod, setEditPaymentMethod] = useState<PaymentMethod>('especes')
@@ -56,7 +74,18 @@ export default function SalesPage() {
   }, [activeProducts, productSearch])
 
   const selectedProduct = products.find((p) => p.id === selectedProductId)
-  const cartTotal = cart.reduce((sum, item) => sum + item.total_price, 0)
+
+  // Calculs remises
+  const subtotal = cart.reduce((sum, item) => sum + item.total_price, 0)
+  const discountAmount = useMemo(() => {
+    if (!discountValue || !showDiscount) return 0
+    const val = parseFloat(discountValue)
+    if (isNaN(val) || val <= 0) return 0
+    if (discountType === 'percent') return Math.round(subtotal * val / 100)
+    return Math.min(val, subtotal)
+  }, [discountValue, discountType, subtotal, showDiscount])
+  const cartTotal = Math.max(0, subtotal - discountAmount)
+
   const montantDu = statut === 'credit'
     ? cartTotal
     : statut === 'partiel'
@@ -80,13 +109,21 @@ export default function SalesPage() {
     setCart((prev) => {
       const existing = prev.find((i) => i.product.id === product.id)
       if (existing) {
+        const newQty = existing.quantity + qty
+        const disc = existing.discount_amount
         return prev.map((i) =>
           i.product.id === product.id
-            ? { ...i, quantity: i.quantity + qty, total_price: (i.quantity + qty) * i.unit_price }
+            ? { ...i, quantity: newQty, total_price: newQty * i.unit_price - disc }
             : i
         )
       }
-      return [...prev, { product, quantity: qty, unit_price: product.selling_price, total_price: qty * product.selling_price }]
+      return [...prev, {
+        product,
+        quantity: qty,
+        unit_price: product.selling_price,
+        discount_amount: 0,
+        total_price: qty * product.selling_price,
+      }]
     })
     setSelectedProductId('')
     setProductSearch('')
@@ -96,12 +133,44 @@ export default function SalesPage() {
   const updateQty = (productId: string, newQty: number) => {
     if (newQty <= 0) { removeFromCart(productId); return }
     setCart((prev) => prev.map((i) =>
-      i.product.id === productId ? { ...i, quantity: newQty, total_price: newQty * i.unit_price } : i
+      i.product.id === productId
+        ? { ...i, quantity: newQty, total_price: newQty * i.unit_price - i.discount_amount }
+        : i
     ))
   }
 
   const removeFromCart = (productId: string) => {
     setCart((prev) => prev.filter((i) => i.product.id !== productId))
+  }
+
+  const applyProductDiscount = (productId: string) => {
+    const val = parseFloat(productDiscountValue)
+    if (isNaN(val) || val < 0) return
+    setCart((prev) => prev.map((i) => {
+      if (i.product.id !== productId) return i
+      const maxDiscount = i.quantity * i.unit_price
+      const disc = Math.min(val, maxDiscount)
+      return { ...i, discount_amount: disc, total_price: i.quantity * i.unit_price - disc }
+    }))
+    setEditingDiscountId(null)
+    setProductDiscountValue('')
+  }
+
+  const handleCreateClient = async () => {
+    if (!newClientName.trim()) return
+    setNewClientSubmitting(true)
+    try {
+      const client = await createClient({ name: newClientName, phone: newClientPhone })
+      setSelectedClientId(client.id)
+      setShowNewClient(false)
+      setNewClientName('')
+      setNewClientPhone('')
+      toast.success('Client créé !', newClientName)
+    } catch {
+      toast.error('Erreur', 'Impossible de créer le client')
+    } finally {
+      setNewClientSubmitting(false)
+    }
   }
 
   const handleSubmitSale = async () => {
@@ -124,6 +193,11 @@ export default function SalesPage() {
         client_id: selectedClientId || null,
         statut,
         montant_paye: statut === 'paye' ? cartTotal : statut === 'partiel' ? parseFloat(montantPaye) : 0,
+        discount: discountAmount > 0 ? {
+          type: discountType,
+          value: parseFloat(discountValue),
+          amount: discountAmount,
+        } : undefined,
       })
       setCart([])
       setNotes('')
@@ -131,6 +205,8 @@ export default function SalesPage() {
       setStatut('paye')
       setMontantPaye('')
       setSelectedClientId('')
+      setDiscountValue('')
+      setShowDiscount(false)
       setActiveTab('list')
     } finally {
       setSubmitting(false)
@@ -161,7 +237,7 @@ export default function SalesPage() {
     setEditSubmitting(true)
     try {
       await updateSale(editingSale.id, { payment_method: editPaymentMethod, notes: editNotes })
-      toast.success('Vente modifiée', 'Les informations ont été mises à jour')
+      toast.success('Vente modifiée')
       setEditingSale(null)
     } catch {
       toast.error('Erreur', 'Impossible de modifier cette vente')
@@ -224,6 +300,7 @@ export default function SalesPage() {
         ))}
       </div>
 
+      {/* Historique */}
       {activeTab === 'list' && (
         <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
           {sales.length === 0 ? (
@@ -244,9 +321,7 @@ export default function SalesPage() {
                   <TableRow key={sale.id}>
                     <TableCell>
                       <p className="font-mono text-xs">{sale.reference}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDateTime(sale.created_at)}
-                      </p>
+                      <p className="text-xs text-muted-foreground">{formatDateTime(sale.created_at)}</p>
                     </TableCell>
                     <TableCell>
                       {sale.client ? (
@@ -260,13 +335,12 @@ export default function SalesPage() {
                     </TableCell>
                     <TableCell>{getStatutBadge(sale)}</TableCell>
                     <TableCell className="text-right">
-                      <p className="font-bold text-emerald-600 text-sm">
-                        {formatCurrency(sale.total_amount)}
-                      </p>
+                      <p className="font-bold text-emerald-600 text-sm">{formatCurrency(sale.total_amount)}</p>
+                      {(sale.discount_amount ?? 0) > 0 && (
+                        <p className="text-xs text-orange-500">Remise: -{formatCurrency(sale.discount_amount!)}</p>
+                      )}
                       {sale.statut === 'partiel' && (
-                        <p className="text-xs text-red-500">
-                          Reste: {formatCurrency(sale.total_amount - (sale.montant_paye ?? 0))}
-                        </p>
+                        <p className="text-xs text-red-500">Reste: {formatCurrency(sale.total_amount - (sale.montant_paye ?? 0))}</p>
                       )}
                       {sale.statut === 'credit' && (
                         <p className="text-xs text-red-500">Non payé</p>
@@ -275,28 +349,14 @@ export default function SalesPage() {
                     <TableCell>
                       <div className="flex items-center gap-1 justify-end">
                         {canExportPDF && (
-                          <button
-                            onClick={() => handleExportReceipt(sale)}
-                            className="p-1.5 hover:bg-orange-50 rounded text-orange-500"
-                            title="Télécharger le reçu PDF"
-                          >
+                          <button onClick={() => handleExportReceipt(sale)} className="p-1.5 hover:bg-orange-50 rounded text-orange-500" title="Reçu PDF">
                             <FileDown className="h-3.5 w-3.5" />
                           </button>
                         )}
-                        <button
-                          onClick={() => openEditModal(sale)}
-                          disabled={isReadOnly}
-                          className="p-1.5 hover:bg-blue-50 rounded text-blue-500 disabled:opacity-30 disabled:cursor-not-allowed"
-                          title="Modifier"
-                        >
+                        <button onClick={() => openEditModal(sale)} disabled={isReadOnly} className="p-1.5 hover:bg-blue-50 rounded text-blue-500 disabled:opacity-30">
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
-                        <button
-                          onClick={() => handleCancelSale(sale.id)}
-                          disabled={cancellingId === sale.id || isReadOnly}
-                          className="p-1.5 hover:bg-red-50 rounded text-red-400 disabled:opacity-30 disabled:cursor-not-allowed"
-                          title="Annuler"
-                        >
+                        <button onClick={() => handleCancelSale(sale.id)} disabled={cancellingId === sale.id || isReadOnly} className="p-1.5 hover:bg-red-50 rounded text-red-400 disabled:opacity-30">
                           <XCircle className="h-3.5 w-3.5" />
                         </button>
                       </div>
@@ -346,20 +406,58 @@ export default function SalesPage() {
               />
             </div>
             <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setEditingSale(null)}>
+              <Button variant="outline" className="flex-1" onClick={() => setEditingSale(null)}>Annuler</Button>
+              <Button className="flex-1" onClick={handleUpdateSale} isLoading={editSubmitting}>Enregistrer</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal nouveau client rapide */}
+      {showNewClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 space-y-4">
+            <h2 className="font-semibold text-lg">Nouveau client</h2>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Nom *</label>
+                <input
+                  type="text"
+                  value={newClientName}
+                  onChange={(e) => setNewClientName(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  placeholder="Nom du client"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Téléphone</label>
+                <input
+                  type="tel"
+                  value={newClientPhone}
+                  onChange={(e) => setNewClientPhone(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  placeholder="+223 XX XX XX XX"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => { setShowNewClient(false); setNewClientName(''); setNewClientPhone('') }}>
                 Annuler
               </Button>
-              <Button className="flex-1" onClick={handleUpdateSale} isLoading={editSubmitting}>
-                Enregistrer
+              <Button className="flex-1" onClick={handleCreateClient} isLoading={newClientSubmitting} disabled={!newClientName.trim()}>
+                Créer
               </Button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Nouvelle vente */}
       {activeTab === 'new' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2 space-y-4">
+            {/* Recherche produit */}
             <Card className="p-4">
               <h3 className="font-medium text-sm mb-3">Ajouter un produit</h3>
               <div className="flex gap-2">
@@ -369,11 +467,7 @@ export default function SalesPage() {
                     <input
                       type="text"
                       value={productSearch}
-                      onChange={(e) => {
-                        setProductSearch(e.target.value)
-                        setSelectedProductId('')
-                        setShowProductDropdown(true)
-                      }}
+                      onChange={(e) => { setProductSearch(e.target.value); setSelectedProductId(''); setShowProductDropdown(true) }}
                       onFocus={() => setShowProductDropdown(true)}
                       disabled={isReadOnly}
                       placeholder="Rechercher un produit par nom..."
@@ -386,29 +480,18 @@ export default function SalesPage() {
                         <p className="px-3 py-2.5 text-sm text-muted-foreground">Aucun produit trouvé</p>
                       ) : (
                         filteredProducts.map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => selectProduct(p)}
-                            className="w-full text-left px-3 py-2.5 text-sm hover:bg-orange-50 transition-colors border-b last:border-b-0"
-                          >
+                          <button key={p.id} type="button" onClick={() => selectProduct(p)} className="w-full text-left px-3 py-2.5 text-sm hover:bg-orange-50 transition-colors border-b last:border-b-0">
                             <p className="font-medium text-slate-900">{p.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatCurrency(p.selling_price)} · Stock: {p.stock_current} · Réf: {p.reference}
-                            </p>
+                            <p className="text-xs text-muted-foreground">{formatCurrency(p.selling_price)} · Stock: {p.stock_current} · Réf: {p.reference}</p>
                           </button>
                         ))
                       )}
                     </div>
                   )}
-                  {showProductDropdown && (
-                    <div className="fixed inset-0 z-10" onClick={() => setShowProductDropdown(false)} />
-                  )}
+                  {showProductDropdown && <div className="fixed inset-0 z-10" onClick={() => setShowProductDropdown(false)} />}
                 </div>
                 <input
-                  type="number"
-                  min="1"
-                  value={qty}
+                  type="number" min="1" value={qty}
                   onChange={(e) => setQty(parseInt(e.target.value) || 1)}
                   disabled={isReadOnly}
                   className="w-20 h-9 rounded-md border border-input bg-background px-3 text-sm text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
@@ -418,82 +501,170 @@ export default function SalesPage() {
                 </Button>
               </div>
               {selectedProduct && (
-                <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1">
-                  ✓ {selectedProduct.name} sélectionné — {formatCurrency(selectedProduct.selling_price)} (stock: {selectedProduct.stock_current})
+                <p className="text-xs text-emerald-600 mt-2">
+                  ✓ {selectedProduct.name} — {formatCurrency(selectedProduct.selling_price)} (stock: {selectedProduct.stock_current})
                 </p>
               )}
             </Card>
 
+            {/* Panier */}
             <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
               {cart.length === 0 ? (
                 <EmptyState icon={ShoppingCart} title="Panier vide" description="Ajoutez des produits pour créer une vente" />
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Produit</TableHead>
-                      <TableHead className="text-right">Prix unit.</TableHead>
-                      <TableHead className="text-center">Qté</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {cart.map((item) => (
-                      <TableRow key={item.product.id}>
-                        <TableCell>
-                          <p className="font-medium text-sm">{item.product.name}</p>
-                          <p className="text-xs font-mono text-muted-foreground">{item.product.reference}</p>
-                        </TableCell>
-                        <TableCell className="text-right text-sm">{formatCurrency(item.unit_price)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center justify-center gap-1">
-                            <button onClick={() => updateQty(item.product.id, item.quantity - 1)} disabled={isReadOnly} className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30">
-                              <Minus className="h-3 w-3" />
-                            </button>
-                            <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                            <button onClick={() => updateQty(item.product.id, item.quantity + 1)} disabled={isReadOnly} className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30">
-                              <Plus className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">{formatCurrency(item.total_price)}</TableCell>
-                        <TableCell>
-                          <button onClick={() => removeFromCart(item.product.id)} disabled={isReadOnly} className="p-1 hover:bg-red-50 rounded disabled:opacity-30">
-                            <Trash2 className="h-3.5 w-3.5 text-red-400" />
-                          </button>
-                        </TableCell>
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Produit</TableHead>
+                        <TableHead className="text-right">Prix unit.</TableHead>
+                        <TableHead className="text-center">Qté</TableHead>
+                        <TableHead className="text-right">Remise</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead></TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {cart.map((item) => (
+                        <TableRow key={item.product.id}>
+                          <TableCell>
+                            <p className="font-medium text-sm">{item.product.name}</p>
+                            <p className="text-xs font-mono text-muted-foreground">{item.product.reference}</p>
+                          </TableCell>
+                          <TableCell className="text-right text-sm">{formatCurrency(item.unit_price)}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-center gap-1">
+                              <button onClick={() => updateQty(item.product.id, item.quantity - 1)} disabled={isReadOnly} className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30">
+                                <Minus className="h-3 w-3" />
+                              </button>
+                              <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                              <button onClick={() => updateQty(item.product.id, item.quantity + 1)} disabled={isReadOnly} className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30">
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {editingDiscountId === item.product.id ? (
+                              <div className="flex items-center gap-1 justify-end">
+                                <input
+                                  type="number"
+                                  value={productDiscountValue}
+                                  onChange={(e) => setProductDiscountValue(e.target.value)}
+                                  className="w-20 h-7 rounded border border-input px-2 text-xs text-right"
+                                  placeholder="0 XOF"
+                                  autoFocus
+                                />
+                                <button onClick={() => applyProductDiscount(item.product.id)} className="text-xs text-emerald-600 font-medium hover:underline">OK</button>
+                                <button onClick={() => setEditingDiscountId(null)} className="text-xs text-muted-foreground hover:underline">✕</button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => { setEditingDiscountId(item.product.id); setProductDiscountValue(item.discount_amount > 0 ? item.discount_amount.toString() : '') }}
+                                className={`text-xs ${item.discount_amount > 0 ? 'text-orange-500 font-medium' : 'text-muted-foreground hover:text-orange-500'}`}
+                              >
+                                {item.discount_amount > 0 ? `-${formatCurrency(item.discount_amount)}` : '+ Remise'}
+                              </button>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">{formatCurrency(item.total_price)}</TableCell>
+                          <TableCell>
+                            <button onClick={() => removeFromCart(item.product.id)} disabled={isReadOnly} className="p-1 hover:bg-red-50 rounded disabled:opacity-30">
+                              <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                            </button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+
+                  {/* Sous-total + remise facture */}
+                  <div className="px-4 py-3 border-t bg-slate-50 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Sous-total</span>
+                      <span className="font-medium">{formatCurrency(subtotal)}</span>
+                    </div>
+
+                    {/* Remise facture */}
+                    {showDiscount ? (
+                      <div className="flex items-center gap-2">
+                        <Tag className="h-3.5 w-3.5 text-orange-500 shrink-0" />
+                        <span className="text-sm text-orange-600 font-medium">Remise facture :</span>
+                        <input
+                          type="number"
+                          value={discountValue}
+                          onChange={(e) => setDiscountValue(e.target.value)}
+                          className="w-24 h-7 rounded border border-input px-2 text-xs text-right"
+                          placeholder="0"
+                        />
+                        <select
+                          value={discountType}
+                          onChange={(e) => setDiscountType(e.target.value as DiscountType)}
+                          className="h-7 rounded border border-input px-1 text-xs"
+                        >
+                          <option value="amount">XOF</option>
+                          <option value="percent">%</option>
+                        </select>
+                        <button onClick={() => { setShowDiscount(false); setDiscountValue('') }} className="text-xs text-muted-foreground hover:text-red-500">✕</button>
+                        {discountAmount > 0 && (
+                          <span className="text-xs text-orange-500 font-medium ml-auto">-{formatCurrency(discountAmount)}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowDiscount(true)}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-orange-500 transition-colors"
+                      >
+                        <Tag className="h-3 w-3" /> Ajouter une remise sur la facture
+                      </button>
+                    )}
+
+                    <div className="flex justify-between text-base font-bold border-t pt-2">
+                      <span>Total</span>
+                      <span className="text-emerald-600">{formatCurrency(cartTotal)}</span>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </div>
 
+          {/* Récapitulatif */}
           <div className="space-y-4">
             <Card className="p-4 space-y-4">
               <h3 className="font-semibold">Récapitulatif</h3>
               <div className="flex items-center justify-between py-2 border-t border-b">
-                <span className="text-sm font-medium">Total</span>
+                <span className="text-sm font-medium">Total à payer</span>
                 <span className="text-xl font-bold text-emerald-600">{formatCurrency(cartTotal)}</span>
               </div>
+
+              {/* Client + bouton ajout rapide */}
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium">
                   Client <span className="text-muted-foreground font-normal">(optionnel)</span>
                 </label>
-                <select
-                  value={selectedClientId}
-                  onChange={(e) => setSelectedClientId(e.target.value)}
-                  disabled={isReadOnly}
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
-                >
-                  <option value="">Aucun client</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                <div className="flex gap-2">
+                  <select
+                    value={selectedClientId}
+                    onChange={(e) => setSelectedClientId(e.target.value)}
+                    disabled={isReadOnly}
+                    className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+                  >
+                    <option value="">Aucun client</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => setShowNewClient(true)}
+                    disabled={isReadOnly}
+                    className="h-9 w-9 flex items-center justify-center rounded-md border border-input hover:bg-orange-50 hover:border-orange-300 hover:text-orange-500 transition-colors disabled:opacity-30"
+                    title="Nouveau client"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
+
               <Select
                 label="Statut du paiement"
                 value={statut}
@@ -507,6 +678,7 @@ export default function SalesPage() {
                   { value: 'partiel', label: '🟡 Paiement partiel' },
                 ]}
               />
+
               {statut === 'partiel' && (
                 <div className="space-y-1.5">
                   <label className="block text-sm font-medium">Montant payé (XOF)</label>
@@ -519,12 +691,11 @@ export default function SalesPage() {
                     placeholder="0"
                   />
                   {parseFloat(montantPaye) > 0 && (
-                    <p className="text-xs text-red-500">
-                      Reste dû : {formatCurrency(cartTotal - parseFloat(montantPaye))}
-                    </p>
+                    <p className="text-xs text-red-500">Reste dû : {formatCurrency(cartTotal - parseFloat(montantPaye))}</p>
                   )}
                 </div>
               )}
+
               {(statut === 'credit' || statut === 'partiel') && selectedClientId && montantDu > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2">
                   <p className="text-xs text-red-600 font-medium">
@@ -533,6 +704,7 @@ export default function SalesPage() {
                   </p>
                 </div>
               )}
+
               {statut !== 'credit' && (
                 <Select
                   label="Mode de paiement"
@@ -545,6 +717,7 @@ export default function SalesPage() {
                   ]}
                 />
               )}
+
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium">Notes (optionnel)</label>
                 <textarea
@@ -554,21 +727,12 @@ export default function SalesPage() {
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
               </div>
-              <Button
-                className="w-full"
-                onClick={handleSubmitSale}
-                disabled={cart.length === 0 || isReadOnly}
-                isLoading={submitting}
-              >
+
+              <Button className="w-full" onClick={handleSubmitSale} disabled={cart.length === 0 || isReadOnly} isLoading={submitting}>
                 <Receipt className="h-4 w-4" />
                 Valider la vente
               </Button>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => setCart([])}
-                disabled={cart.length === 0}
-              >
+              <Button variant="outline" className="w-full" onClick={() => setCart([])} disabled={cart.length === 0}>
                 Vider le panier
               </Button>
             </Card>
