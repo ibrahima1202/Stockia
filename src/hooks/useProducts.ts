@@ -52,6 +52,13 @@ export function useProducts() {
     toast.success('Produit désactivé')
   }
 
+  const createCategory = async (name: string): Promise<Category> => {
+    const category = await productService.createCategory(name)
+    setCategories((prev) => [...prev, category].sort((a, b) => a.name.localeCompare(b.name)))
+    toast.success('Catégorie créée', category.name)
+    return category
+  }
+
   return {
     products,
     categories,
@@ -60,6 +67,7 @@ export function useProducts() {
     createProduct,
     updateProduct,
     deleteProduct,
+    createCategory,
   }
 }
 
@@ -90,4 +98,4 @@ export function useCategories() {
   }
 
   return { categories, isLoading, reload: load, createCategory }
-}
+      }
