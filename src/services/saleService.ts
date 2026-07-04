@@ -43,7 +43,17 @@ export const saleService = {
 
   async create(payload: CreateSalePayload, userId: string): Promise<Sale> {
     const reference = generateReference('VTE')
-    const totalAmount = payload.items.reduce((sum, item) => sum + item.total_price, 0)
+    const businessId = getBusinessId()
+
+    // Calcul du sous-total (après remises produits)
+    const subtotal = payload.items.reduce((sum, item) => sum + item.total_price, 0)
+
+    // Calcul remise facture
+    const discountAmount = payload.discount?.amount ?? 0
+
+    // Total final après remise facture
+    const totalAmount = Math.max(0, subtotal - discountAmount)
+
     const statut = payload.statut ?? 'paye'
     const montantPaye = statut === 'paye'
       ? totalAmount
@@ -51,7 +61,6 @@ export const saleService = {
       ? 0
       : (payload.montant_paye ?? 0)
     const montantDu = totalAmount - montantPaye
-    const businessId = getBusinessId()
 
     // 1. Créer la vente
     const { data: sale, error: saleError } = await supabase
@@ -59,6 +68,7 @@ export const saleService = {
       .insert({
         reference,
         total_amount: totalAmount,
+        discount_amount: discountAmount,
         payment_method: payload.payment_method,
         notes: payload.notes,
         client_id: payload.client_id ?? null,
@@ -71,12 +81,13 @@ export const saleService = {
       .single()
     if (saleError) throw saleError
 
-    // 2. Articles
+    // 2. Articles avec remises produits
     const saleItems = payload.items.map((item) => ({
       sale_id: sale.id,
       product_id: item.product.id,
       quantity: item.quantity,
       unit_price: item.unit_price,
+      discount_amount: item.discount_amount ?? 0,
       total_price: item.total_price,
       business_id: businessId,
     }))
@@ -113,12 +124,13 @@ export const saleService = {
       if (movError) throw movError
     }
 
-    // 4. Journal
+    // 4. Journal — montant encaissé
     if (montantPaye > 0) {
+      const discountLabel = discountAmount > 0 ? ` (remise ${discountAmount} XOF)` : ''
       const { error: journalError } = await supabase.from('journal_entries').insert({
         entry_date: dateFormat(new Date(), 'yyyy-MM-dd'),
         reference,
-        label: `Vente - ${payload.items.map((i) => i.product.name).join(', ')}`,
+        label: `Vente - ${payload.items.map((i) => i.product.name).join(', ')}${discountLabel}`,
         debit: montantPaye,
         credit: 0,
         source_type: 'vente',
@@ -203,4 +215,4 @@ export const saleService = {
     const { error } = await supabase.from('sales').delete().eq('id', id)
     if (error) throw error
   },
-  }
+}
