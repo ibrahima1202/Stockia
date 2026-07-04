@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { useProducts } from '@/hooks/useProducts'
 import { useAuthStore } from '@/store/authStore'
 import { useSubscription } from '@/hooks/useSubscription'
+import { useToast } from '@/store/toastStore'
 import { formatCurrency } from '@/lib/utils'
 import { pdfService } from '@/services/pdfService'
 import type { Product } from '@/types'
@@ -32,6 +33,7 @@ export default function ProductsPage() {
   const { products, categories, isLoading, createProduct, updateProduct, deleteProduct, createCategory } = useProducts()
   const { profile } = useAuthStore()
   const { canExportPDF, business } = useSubscription()
+  const toast = useToast()
   const isAdmin = profile?.role === 'admin'
 
   const [search, setSearch] = useState('')
@@ -110,6 +112,13 @@ export default function ProductsPage() {
         await createProduct(payload)
       }
       setModalOpen(false)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : ''
+      if (msg.includes('duplicate') || msg.includes('unique') || msg.includes('conflict') || msg.includes('409')) {
+        toast.error('Référence déjà utilisée', 'Ce code référence existe déjà. Utilisez une référence différente.')
+      } else {
+        toast.error('Erreur', 'Impossible de créer le produit. Vérifiez les informations.')
+      }
     } finally {
       setSubmitting(false)
     }
@@ -379,4 +388,4 @@ export default function ProductsPage() {
       </Modal>
     </div>
   )
-                        }
+}
