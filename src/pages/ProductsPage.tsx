@@ -69,6 +69,8 @@ export default function ProductsPage() {
   const openCreate = () => {
     setEditProduct(null)
     setSelectedCategoryId('')
+    setShowNewCategory(false)
+    setNewCategoryName('')
     reset({
       name: '', reference: '', category_id: null,
       purchase_price: 0, selling_price: 0,
@@ -80,6 +82,8 @@ export default function ProductsPage() {
   const openEdit = (product: Product) => {
     setEditProduct(product)
     setSelectedCategoryId(product.category_id ?? '')
+    setShowNewCategory(false)
+    setNewCategoryName('')
     reset({
       name: product.name,
       reference: product.reference,
@@ -96,7 +100,7 @@ export default function ProductsPage() {
   const onSubmit = async (data: ProductForm) => {
     setSubmitting(true)
     try {
-      const payload = { ...data, category_id: data.category_id || null }
+      const payload = { ...data, category_id: selectedCategoryId || null }
       if (editProduct) {
         await updateProduct(editProduct.id, payload)
       } else {
@@ -310,7 +314,6 @@ export default function ProductsPage() {
               )}
 
               <select
-                {...register('category_id')}
                 value={selectedCategoryId}
                 onChange={(e) => {
                   setSelectedCategoryId(e.target.value)
@@ -374,4 +377,4 @@ export default function ProductsPage() {
       </Modal>
     </div>
   )
-}
+          }
