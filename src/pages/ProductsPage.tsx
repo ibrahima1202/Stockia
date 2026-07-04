@@ -9,7 +9,6 @@ import {
 } from '@/components/ui/index'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
 import { useProducts } from '@/hooks/useProducts'
 import { useAuthStore } from '@/store/authStore'
 import { useSubscription } from '@/hooks/useSubscription'
@@ -250,12 +249,18 @@ export default function ProductsPage() {
               <Input label="Nom du produit" error={errors.name?.message} required {...register('name')} />
             </div>
             <Input label="Référence" error={errors.reference?.message} required {...register('reference')} />
-            <Select
-              label="Catégorie"
-              options={categories.map((c) => ({ value: c.id, label: c.name }))}
-              placeholder="Sélectionner..."
-              {...register('category_id')}
-            />
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-foreground">Catégorie</label>
+              <select
+                {...register('category_id')}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="">Sans catégorie</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
             <Input label="Prix d'achat (XOF)" type="number" step="1" error={errors.purchase_price?.message} required {...register('purchase_price')} />
             <Input label="Prix de vente (XOF)" type="number" step="1" error={errors.selling_price?.message} required {...register('selling_price')} />
             <Input label="Stock actuel" type="number" error={errors.stock_current?.message} required {...register('stock_current')} />
@@ -305,4 +310,4 @@ export default function ProductsPage() {
       </Modal>
     </div>
   )
-  }
+}
