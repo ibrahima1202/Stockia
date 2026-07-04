@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Search, Package, FileDown, Lock } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, Package, FileDown, Lock, X } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   Badge, Modal, EmptyState, Card
@@ -29,7 +29,7 @@ const productSchema = z.object({
 type ProductForm = z.infer<typeof productSchema>
 
 export default function ProductsPage() {
-  const { products, categories, isLoading, createProduct, updateProduct, deleteProduct } = useProducts()
+  const { products, categories, isLoading, createProduct, updateProduct, deleteProduct, createCategory } = useProducts()
   const { profile } = useAuthStore()
   const { canExportPDF, business } = useSubscription()
   const isAdmin = profile?.role === 'admin'
@@ -41,10 +41,17 @@ export default function ProductsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<Product | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  // Nouvelle catégorie
+  const [showNewCategory, setShowNewCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [categorySubmitting, setCategorySubmitting] = useState(false)
+  const [selectedCategoryId, setSelectedCategoryId] = useState('')
+
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<ProductForm>({ resolver: zodResolver(productSchema) })
 
@@ -61,6 +68,7 @@ export default function ProductsPage() {
 
   const openCreate = () => {
     setEditProduct(null)
+    setSelectedCategoryId('')
     reset({
       name: '', reference: '', category_id: null,
       purchase_price: 0, selling_price: 0,
@@ -71,6 +79,7 @@ export default function ProductsPage() {
 
   const openEdit = (product: Product) => {
     setEditProduct(product)
+    setSelectedCategoryId(product.category_id ?? '')
     reset({
       name: product.name,
       reference: product.reference,
@@ -99,6 +108,21 @@ export default function ProductsPage() {
     }
   }
 
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) return
+    setCategorySubmitting(true)
+    try {
+      const category = await createCategory(newCategoryName.trim())
+      setSelectedCategoryId(category.id)
+      setValue('category_id', category.id)
+      setShowNewCategory(false)
+      setNewCategoryName('')
+    } catch {
+    } finally {
+      setCategorySubmitting(false)
+    }
+  }
+
   const handleExportStock = () => {
     pdfService.exportStock(filtered, business?.name ?? 'Mon Commerce')
   }
@@ -114,20 +138,12 @@ export default function ProductsPage() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {canExportPDF ? (
-            <Button
-              variant="outline"
-              onClick={handleExportStock}
-              disabled={filtered.length === 0}
-              title="Rapport PDF"
-            >
+            <Button variant="outline" onClick={handleExportStock} disabled={filtered.length === 0} title="Rapport PDF">
               <FileDown className="h-4 w-4" />
               <span className="hidden sm:inline">Rapport PDF</span>
             </Button>
           ) : (
-            <button
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-dashed border-slate-300 text-slate-400 text-sm cursor-not-allowed"
-              title="Fonctionnalité Pro"
-            >
+            <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-dashed border-slate-300 text-slate-400 text-sm cursor-not-allowed" title="Fonctionnalité Pro">
               <Lock className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">PDF (Pro)</span>
             </button>
@@ -239,7 +255,7 @@ export default function ProductsPage() {
       {/* Create/Edit Modal */}
       <Modal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => { setModalOpen(false); setShowNewCategory(false); setNewCategoryName('') }}
         title={editProduct ? 'Modifier le produit' : 'Nouveau produit'}
         size="lg"
       >
@@ -249,10 +265,57 @@ export default function ProductsPage() {
               <Input label="Nom du produit" error={errors.name?.message} required {...register('name')} />
             </div>
             <Input label="Référence" error={errors.reference?.message} required {...register('reference')} />
+
+            {/* Catégorie + ajout rapide */}
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-foreground">Catégorie</label>
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-foreground">Catégorie</label>
+                <button
+                  type="button"
+                  onClick={() => setShowNewCategory(!showNewCategory)}
+                  className="text-xs text-orange-500 hover:underline flex items-center gap-1"
+                >
+                  <Plus className="h-3 w-3" /> Nouvelle catégorie
+                </button>
+              </div>
+
+              {/* Formulaire nouvelle catégorie */}
+              {showNewCategory && (
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="Nom de la catégorie..."
+                    className="flex-1 h-8 rounded-md border border-orange-300 bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-orange-400"
+                    autoFocus
+                    onKeyDown={(e) => e.key === 'Enter' && handleCreateCategory()}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateCategory}
+                    disabled={categorySubmitting || !newCategoryName.trim()}
+                    className="h-8 px-3 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-xs font-medium disabled:opacity-50 transition-colors"
+                  >
+                    {categorySubmitting ? '...' : 'Créer'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowNewCategory(false); setNewCategoryName('') }}
+                    className="h-8 w-8 flex items-center justify-center hover:bg-muted rounded-md"
+                  >
+                    <X className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                </div>
+              )}
+
               <select
                 {...register('category_id')}
+                value={selectedCategoryId}
+                onChange={(e) => {
+                  setSelectedCategoryId(e.target.value)
+                  setValue('category_id', e.target.value)
+                }}
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 <option value="">Sans catégorie</option>
@@ -261,6 +324,7 @@ export default function ProductsPage() {
                 ))}
               </select>
             </div>
+
             <Input label="Prix d'achat (XOF)" type="number" step="1" error={errors.purchase_price?.message} required {...register('purchase_price')} />
             <Input label="Prix de vente (XOF)" type="number" step="1" error={errors.selling_price?.message} required {...register('selling_price')} />
             <Input label="Stock actuel" type="number" error={errors.stock_current?.message} required {...register('stock_current')} />
