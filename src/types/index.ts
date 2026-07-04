@@ -49,6 +49,7 @@ export interface Sale {
   id: string
   reference: string
   total_amount: number
+  discount_amount?: number
   payment_method: PaymentMethod
   notes?: string
   client_id?: string | null
@@ -66,6 +67,7 @@ export interface SaleItem {
   product_id: string
   quantity: number
   unit_price: number
+  discount_amount?: number
   total_price: number
   created_at: string
   product?: Product
@@ -201,12 +203,22 @@ export interface DashboardStats {
 // ============================================================
 // FORM TYPES
 // ============================================================
+export type DiscountType = 'amount' | 'percent'
+
 export interface SaleCartItem {
   product: Product
   quantity: number
   unit_price: number
-  total_price: number
+  discount_amount: number      // remise sur ce produit en XOF
+  total_price: number          // après remise produit
 }
+
+export interface SaleDiscount {
+  type: DiscountType           // 'amount' ou 'percent'
+  value: number                // montant XOF ou pourcentage
+  amount: number               // montant calculé en XOF
+}
+
 export interface CreateSalePayload {
   items: SaleCartItem[]
   payment_method: PaymentMethod
@@ -214,7 +226,9 @@ export interface CreateSalePayload {
   client_id?: string | null
   montant_paye?: number
   statut?: SaleStatut
+  discount?: SaleDiscount      // remise sur la facture totale
 }
+
 // ============================================================
 // ABONNEMENTS & PLANS
 // ============================================================
@@ -242,7 +256,6 @@ export interface Subscription {
   current_period_end: string
   created_at: string
   updated_at: string
-  // Joined
   plan?: Plan
 }
 
