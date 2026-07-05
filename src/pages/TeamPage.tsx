@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Users, Shield, ShieldOff, UserCheck, UserX, Plus, Eye, EyeOff } from 'lucide-react'
+import { Users, Shield, UserCheck, UserX, Plus, Eye, EyeOff } from 'lucide-react'
 import { LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge, EmptyState, Card } from '@/components/ui/index'
 import { Button } from '@/components/ui/button'
 import { useTeam } from '@/hooks/useTeam'
