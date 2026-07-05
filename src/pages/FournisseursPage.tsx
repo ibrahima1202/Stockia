@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Phone, MapPin, Wallet, XCircle, Pencil, ShoppingBag, Minus, Trash2 } from 'lucide-react'
+import { Plus, Phone, MapPin, Wallet, XCircle, Pencil, ShoppingBag, Minus, Trash2, Lock, Crown } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   Badge, EmptyState, Card
@@ -9,11 +9,11 @@ import { Select } from '@/components/ui/select'
 import { useFournisseurs } from '@/hooks/useFournisseurs'
 import { useProducts } from '@/hooks/useProducts'
 import { useCategories } from '@/hooks/useProducts'
+import { useSubscription } from '@/hooks/useSubscription'
+import { useRole } from '@/hooks/useRole'
+import { useNavigate } from 'react-router-dom'
 import { formatCurrency } from '@/lib/utils'
 import type { Fournisseur, PaymentMethod, AchatCartItem, AchatStatut } from '@/types'
-import { useSubscription } from '@/hooks/useSubscription'
-import { useNavigate } from 'react-router-dom'
-import { Lock, Crown } from 'lucide-react'
 
 export default function FournisseursPage() {
   const {
@@ -24,16 +24,14 @@ export default function FournisseursPage() {
   const { products, reload: reloadProducts } = useProducts()
   const { categories, createCategory } = useCategories()
   const { canAccessClientsAndFournisseurs, isLoading: subLoading } = useSubscription()
-const navigate = useNavigate()
+  const { canViewFournisseurs, canManageFournisseurs, canManageAchats } = useRole()
+  const navigate = useNavigate()
 
-
-  // Modal création/édition fournisseur
   const [showForm, setShowForm] = useState(false)
   const [editingFourn, setEditingFourn] = useState<Fournisseur | null>(null)
   const [formData, setFormData] = useState({ name: '', phone: '', address: '', notes: '' })
   const [formSubmitting, setFormSubmitting] = useState(false)
 
-  // Modal achat
   const [achatFourn, setAchatFourn] = useState<Fournisseur | null>(null)
   const [achatCart, setAchatCart] = useState<AchatCartItem[]>([])
   const [achatStatut, setAchatStatut] = useState<AchatStatut>('comptant')
@@ -45,19 +43,16 @@ const navigate = useNavigate()
   const [achatQty, setAchatQty] = useState(1)
   const [achatUnitPrice, setAchatUnitPrice] = useState('')
 
-  // Modal création rapide produit
   const [showNewProduct, setShowNewProduct] = useState(false)
   const [newProductData, setNewProductData] = useState({
     name: '', reference: '', category_id: '', purchase_price: '', selling_price: ''
   })
   const [newProductSubmitting, setNewProductSubmitting] = useState(false)
 
-  // Modal création rapide catégorie
   const [showNewCategory, setShowNewCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
   const [newCategorySubmitting, setNewCategorySubmitting] = useState(false)
 
-  // Modal règlement
   const [reglementFourn, setReglementFourn] = useState<Fournisseur | null>(null)
   const [reglementMontant, setReglementMontant] = useState('')
   const [reglementMethod, setReglementMethod] = useState<PaymentMethod>('especes')
@@ -71,10 +66,7 @@ const navigate = useNavigate()
     ? achatTotal - (parseFloat(achatMontantPaye) || 0)
     : 0
 
-  const activeProducts = useMemo(
-    () => products.filter((p) => p.is_active),
-    [products]
-  )
+  const activeProducts = useMemo(() => products.filter((p) => p.is_active), [products])
 
   const openCreate = () => {
     setEditingFourn(null)
@@ -146,17 +138,10 @@ const navigate = useNavigate()
   }
 
   const updateAchatQty = (productId: string, newQty: number) => {
-    if (newQty <= 0) {
-      removeFromAchatCart(productId)
-      return
-    }
-    setAchatCart((prev) =>
-      prev.map((i) =>
-        i.product.id === productId
-          ? { ...i, quantity: newQty, total_price: newQty * i.unit_price }
-          : i
-      )
-    )
+    if (newQty <= 0) { removeFromAchatCart(productId); return }
+    setAchatCart((prev) => prev.map((i) =>
+      i.product.id === productId ? { ...i, quantity: newQty, total_price: newQty * i.unit_price } : i
+    ))
   }
 
   const handleAchat = async () => {
@@ -234,47 +219,57 @@ const navigate = useNavigate()
 
   if (isLoading || subLoading) return <LoadingScreen text="Chargement des fournisseurs..." />
 
+  // Blocage plan Starter
   if (!canAccessClientsAndFournisseurs) {
-  return (
-    <div className="space-y-5">
-      <div className="flex flex-col items-center justify-center py-16 space-y-5 text-center">
-        <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center">
-          <Lock className="h-10 w-10 text-orange-500" />
+    return (
+      <div className="space-y-5">
+        <div className="flex flex-col items-center justify-center py-16 space-y-5 text-center">
+          <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center">
+            <Lock className="h-10 w-10 text-orange-500" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">Fonctionnalité Business</h1>
+            <p className="text-sm text-muted-foreground mt-2 max-w-sm">
+              La gestion des fournisseurs et achats est disponible à partir du plan Business.
+            </p>
+          </div>
+          <Card className="p-5 w-full max-w-sm text-left space-y-3">
+            <div className="flex items-center gap-2">
+              <Crown className="h-4 w-4 text-orange-500" />
+              <p className="font-semibold text-sm">Plan Business — 7 500 XOF/mois</p>
+            </div>
+            <ul className="space-y-1.5">
+              {['Tout le plan Starter', 'Gestion des fournisseurs', "Factures d'achat", 'Gestion des dettes', 'Gestion des clients', '3 utilisateurs', 'Produits illimités'].map((f) => (
+                <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
+                  <span className="text-emerald-500">✓</span> {f}
+                </li>
+              ))}
+            </ul>
+            <Button className="w-full" onClick={() => navigate('/subscription')}>
+              Passer au plan Business
+            </Button>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
+  // Blocage par rôle
+  if (!canViewFournisseurs) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 space-y-4 text-center">
+        <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center">
+          <Lock className="h-10 w-10 text-red-500" />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Fonctionnalité Business</h1>
-          <p className="text-sm text-muted-foreground mt-2 max-w-sm">
-            La gestion des fournisseurs et achats est disponible à partir du plan Business.
+          <h1 className="text-xl font-bold text-slate-900">Accès non autorisé</h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            Vous n'avez pas les permissions pour accéder aux fournisseurs.
           </p>
         </div>
-        <Card className="p-5 w-full max-w-sm text-left space-y-3">
-          <div className="flex items-center gap-2">
-            <Crown className="h-4 w-4 text-orange-500" />
-            <p className="font-semibold text-sm">Plan Business — 7 500 XOF/mois</p>
-          </div>
-          <ul className="space-y-1.5">
-            {[
-              'Tout le plan Starter',
-              'Gestion des fournisseurs',
-              'Factures d\'achat',
-              'Gestion des dettes',
-              'Gestion des clients',
-              '3 utilisateurs',
-              'Produits illimités',
-            ].map((f) => (
-              <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
-                <span className="text-emerald-500">✓</span> {f}
-              </li>
-            ))}
-          </ul>
-          <Button className="w-full" onClick={() => navigate('/subscription')}>
-            Passer au plan Business
-          </Button>
-        </Card>
       </div>
-    </div>
-  )
-}
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -283,9 +278,11 @@ const navigate = useNavigate()
           <h1 className="page-title">Fournisseurs</h1>
           <p className="text-sm text-muted-foreground">{fournisseurs.length} fournisseur(s)</p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4" /> Nouveau
-        </Button>
+        {canManageFournisseurs && (
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4" /> Nouveau
+          </Button>
+        )}
       </div>
 
       {/* Résumé */}
@@ -338,28 +335,26 @@ const navigate = useNavigate()
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 justify-end">
-                      <button
-                        onClick={() => openAchat(fourn)}
-                        className="p-1.5 hover:bg-orange-50 rounded text-orange-500"
-                        title="Nouvel achat"
-                      >
-                        <ShoppingBag className="h-3.5 w-3.5" />
-                      </button>
-                      {fourn.solde > 0 && (
-                        <button
-                          onClick={() => setReglementFourn(fourn)}
-                          className="p-1.5 hover:bg-green-50 rounded text-green-600"
-                          title="Payer"
-                        >
+                      {canManageAchats && (
+                        <button onClick={() => openAchat(fourn)} className="p-1.5 hover:bg-orange-50 rounded text-orange-500" title="Nouvel achat">
+                          <ShoppingBag className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {canManageFournisseurs && fourn.solde > 0 && (
+                        <button onClick={() => setReglementFourn(fourn)} className="p-1.5 hover:bg-green-50 rounded text-green-600" title="Payer">
                           <Wallet className="h-3.5 w-3.5" />
                         </button>
                       )}
-                      <button onClick={() => openEdit(fourn)} className="p-1.5 hover:bg-blue-50 rounded text-blue-500">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button onClick={() => handleDelete(fourn.id)} className="p-1.5 hover:bg-red-50 rounded text-red-400">
-                        <XCircle className="h-3.5 w-3.5" />
-                      </button>
+                      {canManageFournisseurs && (
+                        <>
+                          <button onClick={() => openEdit(fourn)} className="p-1.5 hover:bg-blue-50 rounded text-blue-500">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button onClick={() => handleDelete(fourn.id)} className="p-1.5 hover:bg-red-50 rounded text-red-400">
+                            <XCircle className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -370,7 +365,7 @@ const navigate = useNavigate()
       </div>
 
       {/* Modal création/édition fournisseur */}
-      {showForm && (
+      {showForm && canManageFournisseurs && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
             <h2 className="font-semibold text-lg">{editingFourn ? 'Modifier' : 'Nouveau fournisseur'}</h2>
@@ -400,19 +395,14 @@ const navigate = useNavigate()
       )}
 
       {/* Modal achat */}
-      {achatFourn && (
+      {achatFourn && canManageAchats && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-2">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 space-y-4">
             <h2 className="font-semibold text-lg">Facture d'achat — {achatFourn.name}</h2>
-
-            {/* Sélection produit */}
             <Card className="p-3 space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">Ajouter un produit</p>
-                <button
-                  onClick={() => setShowNewProduct(true)}
-                  className="text-xs text-primary flex items-center gap-1 hover:underline"
-                >
+                <button onClick={() => setShowNewProduct(true)} className="text-xs text-primary flex items-center gap-1 hover:underline">
                   <Plus className="h-3 w-3" /> Nouveau produit
                 </button>
               </div>
@@ -433,23 +423,11 @@ const navigate = useNavigate()
               <div className="flex gap-2">
                 <div className="flex-1">
                   <label className="text-xs text-muted-foreground">Prix achat (XOF)</label>
-                  <input
-                    type="number"
-                    value={achatUnitPrice}
-                    onChange={(e) => setAchatUnitPrice(e.target.value)}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-                    placeholder="0"
-                  />
+                  <input type="number" value={achatUnitPrice} onChange={(e) => setAchatUnitPrice(e.target.value)} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" placeholder="0" />
                 </div>
                 <div className="w-20">
                   <label className="text-xs text-muted-foreground">Qté</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={achatQty}
-                    onChange={(e) => setAchatQty(parseInt(e.target.value) || 1)}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-center"
-                  />
+                  <input type="number" min="1" value={achatQty} onChange={(e) => setAchatQty(parseInt(e.target.value) || 1)} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-center" />
                 </div>
                 <div className="flex items-end">
                   <Button onClick={addToAchatCart} disabled={!selectedProductId || !achatUnitPrice}>
@@ -459,7 +437,6 @@ const navigate = useNavigate()
               </div>
             </Card>
 
-            {/* Panier achat */}
             {achatCart.length > 0 && (
               <div className="border rounded-lg overflow-hidden">
                 <Table>
@@ -480,24 +457,16 @@ const navigate = useNavigate()
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => updateAchatQty(item.product.id, item.quantity - 1)}
-                              className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted"
-                            >
+                            <button onClick={() => updateAchatQty(item.product.id, item.quantity - 1)} className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted">
                               <Minus className="h-3 w-3" />
                             </button>
                             <span className="w-8 text-center text-sm">{item.quantity}</span>
-                            <button
-                              onClick={() => updateAchatQty(item.product.id, item.quantity + 1)}
-                              className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted"
-                            >
+                            <button onClick={() => updateAchatQty(item.product.id, item.quantity + 1)} className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted">
                               <Plus className="h-3 w-3" />
                             </button>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-semibold text-sm">
-                          {formatCurrency(item.total_price)}
-                        </TableCell>
+                        <TableCell className="text-right font-semibold text-sm">{formatCurrency(item.total_price)}</TableCell>
                         <TableCell>
                           <button onClick={() => removeFromAchatCart(item.product.id)} className="p-1 hover:bg-red-50 rounded">
                             <Trash2 className="h-3.5 w-3.5 text-red-400" />
@@ -514,7 +483,6 @@ const navigate = useNavigate()
               </div>
             )}
 
-            {/* Paiement */}
             <div className="space-y-3">
               <Select
                 label="Mode de règlement"
@@ -526,25 +494,15 @@ const navigate = useNavigate()
                   { value: 'partiel', label: '🟡 Paiement partiel' },
                 ]}
               />
-
               {achatStatut === 'partiel' && (
                 <div>
                   <label className="block text-sm font-medium mb-1">Montant payé (XOF)</label>
-                  <input
-                    type="number"
-                    value={achatMontantPaye}
-                    onChange={(e) => setAchatMontantPaye(e.target.value)}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-                    placeholder="0"
-                  />
+                  <input type="number" value={achatMontantPaye} onChange={(e) => setAchatMontantPaye(e.target.value)} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" placeholder="0" />
                   {parseFloat(achatMontantPaye) > 0 && (
-                    <p className="text-xs text-red-500 mt-1">
-                      Reste dû : {formatCurrency(achatTotal - parseFloat(achatMontantPaye))}
-                    </p>
+                    <p className="text-xs text-red-500 mt-1">Reste dû : {formatCurrency(achatTotal - parseFloat(achatMontantPaye))}</p>
                   )}
                 </div>
               )}
-
               {achatStatut !== 'credit' && (
                 <Select
                   label="Mode de paiement"
@@ -557,34 +515,19 @@ const navigate = useNavigate()
                   ]}
                 />
               )}
-
               {montantDu > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2">
-                  <p className="text-xs text-red-600 font-medium">
-                    {formatCurrency(montantDu)} sera ajouté à la dette envers {achatFourn.name}
-                  </p>
+                  <p className="text-xs text-red-600 font-medium">{formatCurrency(montantDu)} sera ajouté à la dette envers {achatFourn.name}</p>
                 </div>
               )}
-
               <div>
                 <label className="block text-sm font-medium mb-1">Notes</label>
-                <textarea
-                  value={achatNotes}
-                  onChange={(e) => setAchatNotes(e.target.value)}
-                  rows={2}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                />
+                <textarea value={achatNotes} onChange={(e) => setAchatNotes(e.target.value)} rows={2} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
               </div>
             </div>
-
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setAchatFourn(null)}>Annuler</Button>
-              <Button
-                className="flex-1"
-                onClick={handleAchat}
-                isLoading={achatSubmitting}
-                disabled={achatCart.length === 0}
-              >
+              <Button className="flex-1" onClick={handleAchat} isLoading={achatSubmitting} disabled={achatCart.length === 0}>
                 Valider la facture
               </Button>
             </div>
@@ -600,37 +543,20 @@ const navigate = useNavigate()
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium mb-1">Nom *</label>
-                <input
-                  type="text"
-                  value={newProductData.name}
-                  onChange={(e) => setNewProductData({ ...newProductData, name: e.target.value })}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-                />
+                <input type="text" value={newProductData.name} onChange={(e) => setNewProductData({ ...newProductData, name: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Référence *</label>
-                <input
-                  type="text"
-                  value={newProductData.reference}
-                  onChange={(e) => setNewProductData({ ...newProductData, reference: e.target.value })}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-                />
+                <input type="text" value={newProductData.reference} onChange={(e) => setNewProductData({ ...newProductData, reference: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" />
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-sm font-medium">Catégorie</label>
-                  <button
-                    onClick={() => setShowNewCategory(true)}
-                    className="text-xs text-primary flex items-center gap-1 hover:underline"
-                  >
+                  <button onClick={() => setShowNewCategory(true)} className="text-xs text-primary flex items-center gap-1 hover:underline">
                     <Plus className="h-3 w-3" /> Nouvelle catégorie
                   </button>
                 </div>
-                <select
-                  value={newProductData.category_id}
-                  onChange={(e) => setNewProductData({ ...newProductData, category_id: e.target.value })}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-                >
+                <select value={newProductData.category_id} onChange={(e) => setNewProductData({ ...newProductData, category_id: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
                   <option value="">Sans catégorie</option>
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
@@ -640,31 +566,17 @@ const navigate = useNavigate()
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-sm font-medium mb-1">Prix achat</label>
-                  <input
-                    type="number"
-                    value={newProductData.purchase_price}
-                    onChange={(e) => setNewProductData({ ...newProductData, purchase_price: e.target.value })}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-                    placeholder="0"
-                  />
+                  <input type="number" value={newProductData.purchase_price} onChange={(e) => setNewProductData({ ...newProductData, purchase_price: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" placeholder="0" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Prix vente</label>
-                  <input
-                    type="number"
-                    value={newProductData.selling_price}
-                    onChange={(e) => setNewProductData({ ...newProductData, selling_price: e.target.value })}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-                    placeholder="0"
-                  />
+                  <input type="number" value={newProductData.selling_price} onChange={(e) => setNewProductData({ ...newProductData, selling_price: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" placeholder="0" />
                 </div>
               </div>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setShowNewProduct(false)}>Annuler</Button>
-              <Button className="flex-1" onClick={handleCreateProduct} isLoading={newProductSubmitting}>
-                Créer
-              </Button>
+              <Button className="flex-1" onClick={handleCreateProduct} isLoading={newProductSubmitting}>Créer</Button>
             </div>
           </div>
         </div>
@@ -677,34 +589,18 @@ const navigate = useNavigate()
             <h2 className="font-semibold text-lg">Nouvelle catégorie</h2>
             <div>
               <label className="block text-sm font-medium mb-1">Nom de la catégorie *</label>
-              <input
-                type="text"
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-                placeholder="Ex: Plomberie, Électricité..."
-                autoFocus
-              />
+              <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" placeholder="Ex: Plomberie, Électricité..." autoFocus />
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => { setShowNewCategory(false); setNewCategoryName('') }}>
-                Annuler
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={handleCreateCategory}
-                isLoading={newCategorySubmitting}
-                disabled={!newCategoryName.trim()}
-              >
-                Créer
-              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => { setShowNewCategory(false); setNewCategoryName('') }}>Annuler</Button>
+              <Button className="flex-1" onClick={handleCreateCategory} isLoading={newCategorySubmitting} disabled={!newCategoryName.trim()}>Créer</Button>
             </div>
           </div>
         </div>
       )}
 
       {/* Modal règlement */}
-      {reglementFourn && (
+      {reglementFourn && canManageFournisseurs && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
             <h2 className="font-semibold text-lg">Paiement fournisseur</h2>
@@ -714,13 +610,7 @@ const navigate = useNavigate()
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium mb-1">Montant payé (XOF) *</label>
-                <input
-                  type="number"
-                  value={reglementMontant}
-                  onChange={(e) => setReglementMontant(e.target.value)}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-                  placeholder="0"
-                />
+                <input type="number" value={reglementMontant} onChange={(e) => setReglementMontant(e.target.value)} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" placeholder="0" />
               </div>
               <Select
                 label="Mode de paiement"
@@ -734,19 +624,12 @@ const navigate = useNavigate()
               />
               <div>
                 <label className="block text-sm font-medium mb-1">Notes</label>
-                <textarea
-                  value={reglementNotes}
-                  onChange={(e) => setReglementNotes(e.target.value)}
-                  rows={2}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                />
+                <textarea value={reglementNotes} onChange={(e) => setReglementNotes(e.target.value)} rows={2} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
               </div>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setReglementFourn(null)}>Annuler</Button>
-              <Button className="flex-1" onClick={handleReglement} isLoading={reglementSubmitting} disabled={!reglementMontant}>
-                Payer
-              </Button>
+              <Button className="flex-1" onClick={handleReglement} isLoading={reglementSubmitting} disabled={!reglementMontant}>Payer</Button>
             </div>
           </div>
         </div>
