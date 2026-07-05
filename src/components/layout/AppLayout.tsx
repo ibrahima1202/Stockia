@@ -10,6 +10,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useRole } from '@/hooks/useRole'
 import { SubscriptionBanner } from './SubscriptionBanner'
+import { Sidebar } from './Sidebar'
 
 export function AppLayout() {
   const { signOut } = useAuth()
@@ -49,6 +50,9 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Sidebar desktop */}
+      <Sidebar />
+
       {/* Header mobile */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-slate-900 border-b border-slate-800 px-4 h-14 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -69,7 +73,7 @@ export function AppLayout() {
           </div>
         </div>
 
-        {/* User menu */}
+        {/* User menu mobile */}
         <div className="relative">
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
@@ -118,7 +122,7 @@ export function AppLayout() {
         </div>
       </header>
 
-      {/* Subscription banner */}
+      {/* Subscription banner mobile */}
       {(isTrialing || isExpired) && (
         <div className="lg:hidden fixed top-14 left-0 right-0 z-30">
           <SubscriptionBanner />
@@ -126,7 +130,7 @@ export function AppLayout() {
       )}
 
       {/* Main content */}
-      <main className={`lg:ml-64 pt-14 ${(isTrialing || isExpired) ? 'lg:pt-0 pt-24' : ''} pb-20 lg:pb-6`}>
+      <main className={`lg:ml-64 pt-14 lg:pt-0 ${(isTrialing || isExpired) ? 'pt-24' : ''} pb-20 lg:pb-6`}>
         <div className="max-w-5xl mx-auto px-4 py-5">
           <Outlet />
         </div>
