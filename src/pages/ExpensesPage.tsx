@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Trash2, Receipt } from 'lucide-react'
+import { Plus, Trash2, Receipt, Lock } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   Badge, Modal, EmptyState, Card
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { useExpenses } from '@/hooks/useExpenses'
+import { useRole } from '@/hooks/useRole'
 import { formatCurrency, formatDate, formatExpenseCategory } from '@/lib/utils'
 import type { ExpenseCategory } from '@/types'
 import { format } from 'date-fns'
@@ -31,6 +32,7 @@ const categoryVariants: Record<ExpenseCategory, 'info' | 'warning' | 'default'> 
 
 export default function ExpensesPage() {
   const { expenses, isLoading, createExpense, deleteExpense } = useExpenses()
+  const { canManageExpenses } = useRole()
   const [modalOpen, setModalOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -60,6 +62,23 @@ export default function ExpensesPage() {
   }
 
   if (isLoading) return <LoadingScreen text="Chargement des dépenses..." />
+
+  // Blocage par rôle
+  if (!canManageExpenses) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 space-y-4 text-center">
+        <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center">
+          <Lock className="h-10 w-10 text-red-500" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Accès non autorisé</h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            Vous n'avez pas les permissions pour accéder aux dépenses.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -156,12 +175,7 @@ export default function ExpensesPage() {
       </div>
 
       {/* Create Modal */}
-      <Modal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title="Nouvelle dépense"
-        size="md"
-      >
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nouvelle dépense" size="md">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Select
             label="Catégorie"
@@ -175,46 +189,18 @@ export default function ExpensesPage() {
             placeholder="Sélectionner..."
             {...register('category')}
           />
-          <Input
-            label="Description"
-            required
-            placeholder="Ex: Carburant livraison..."
-            error={errors.description?.message}
-            {...register('description')}
-          />
-          <Input
-            label="Montant (XOF)"
-            type="number"
-            min="1"
-            required
-            error={errors.amount?.message}
-            {...register('amount')}
-          />
-          <Input
-            label="Date"
-            type="date"
-            required
-            error={errors.expense_date?.message}
-            {...register('expense_date')}
-          />
+          <Input label="Description" required placeholder="Ex: Carburant livraison..." error={errors.description?.message} {...register('description')} />
+          <Input label="Montant (XOF)" type="number" min="1" required error={errors.amount?.message} {...register('amount')} />
+          <Input label="Date" type="date" required error={errors.expense_date?.message} {...register('expense_date')} />
           <div className="flex gap-2 pt-2">
-            <Button type="submit" isLoading={submitting} className="flex-1">
-              Enregistrer
-            </Button>
-            <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
-              Annuler
-            </Button>
+            <Button type="submit" isLoading={submitting} className="flex-1">Enregistrer</Button>
+            <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Annuler</Button>
           </div>
         </form>
       </Modal>
 
       {/* Delete confirmation */}
-      <Modal
-        open={!!deleteConfirm}
-        onClose={() => setDeleteConfirm(null)}
-        title="Supprimer la dépense"
-        size="sm"
-      >
+      <Modal open={!!deleteConfirm} onClose={() => setDeleteConfirm(null)} title="Supprimer la dépense" size="sm">
         <p className="text-sm text-muted-foreground mb-4">
           Voulez-vous vraiment supprimer cette dépense ?
         </p>
