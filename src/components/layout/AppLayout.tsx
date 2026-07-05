@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Package, Warehouse, ShoppingCart,
   BookOpen, Receipt, LogOut, Users, Truck, UserCircle,
@@ -11,7 +11,7 @@ import { useSubscription } from '@/hooks/useSubscription'
 import { useRole } from '@/hooks/useRole'
 import { SubscriptionBanner } from './SubscriptionBanner'
 
-export function AppLayout({ children }: { children: React.ReactNode }) {
+export function AppLayout({ children }: { children?: React.ReactNode }) {
   const { signOut } = useAuth()
   const { profile } = useAuthStore()
   const { subscription } = useSubscription()
@@ -32,7 +32,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     await signOut()
   }
 
-  // Navigation bottom bar
   const bottomNavItems = [
     { to: '/', icon: LayoutDashboard, label: 'Accueil', show: true },
     { to: '/products', icon: Package, label: 'Produits', show: true },
@@ -40,7 +39,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { to: '/sales', icon: ShoppingCart, label: 'Ventes', show: canManageSales },
   ].filter((i) => i.show)
 
-  // Menu "Plus"
   const moreItems = [
     { to: '/clients', icon: Users, label: 'Clients', show: canViewClients },
     { to: '/fournisseurs', icon: Truck, label: 'Fournisseurs', show: canViewFournisseurs },
@@ -130,7 +128,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Main content */}
       <main className={`lg:ml-64 pt-14 ${(isTrialing || isExpired) ? 'lg:pt-0 pt-24' : ''} pb-20 lg:pb-6`}>
         <div className="max-w-5xl mx-auto px-4 py-5">
-          {children}
+          {children ?? <Outlet />}
         </div>
       </main>
 
@@ -152,7 +150,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </NavLink>
         ))}
 
-        {/* Bouton Plus */}
         {moreItems.length > 0 && (
           <button
             onClick={() => setShowMore(true)}
@@ -164,7 +161,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         )}
       </nav>
 
-      {/* Menu Plus (sheet) */}
+      {/* Menu Plus */}
       {showMore && (
         <>
           <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowMore(false)} />
