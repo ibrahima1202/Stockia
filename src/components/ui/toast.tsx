@@ -18,16 +18,15 @@ const styles = {
 
 export function ToastContainer() {
   const { toasts, removeToast } = useToastStore()
-
   return (
-    <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 w-80">
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 w-[90vw] max-w-sm">
       {toasts.map((toast) => {
         const Icon = icons[toast.type]
         return (
           <div
             key={toast.id}
             className={cn(
-              'flex items-start gap-3 rounded-lg border p-3 shadow-md animate-in slide-in-from-right-full',
+              'flex items-start gap-3 rounded-lg border p-3 shadow-md animate-in slide-in-from-top-full',
               styles[toast.type]
             )}
           >
