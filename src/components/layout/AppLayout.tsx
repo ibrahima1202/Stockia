@@ -11,10 +11,10 @@ import { useSubscription } from '@/hooks/useSubscription'
 import { useRole } from '@/hooks/useRole'
 import { SubscriptionBanner } from './SubscriptionBanner'
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export function AppLayout({ children }: { children: React.ReactNode }) {
   const { signOut } = useAuth()
   const { profile } = useAuthStore()
-  const { isExpired, daysLeftInTrial, subscription } = useSubscription()
+  const { subscription } = useSubscription()
   const {
     isAdmin, canManageSales, canManageStock, canViewClients,
     canViewFournisseurs, canViewJournal, canManageExpenses, canViewStats
@@ -25,6 +25,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [showUserMenu, setShowUserMenu] = useState(false)
 
   const isTrialing = subscription?.status === 'trial'
+  const isExpired = subscription ? subscription.status === 'expired' : false
 
   const handleSignOut = async () => {
     setShowUserMenu(false)
@@ -122,7 +123,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Subscription banner */}
       {(isTrialing || isExpired) && (
         <div className="lg:hidden fixed top-14 left-0 right-0 z-30">
-          <SubscriptionBanner daysLeft={daysLeftInTrial} isExpired={isExpired} />
+          <SubscriptionBanner />
         </div>
       )}
 
