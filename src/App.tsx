@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import LoginPage from '@/pages/LoginPage'
@@ -25,6 +25,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/setup" element={<SetupPage />} />
         <Route path="/payment" element={
           <ProtectedRoute>
             <PaymentPage />
@@ -33,7 +34,9 @@ export default function App() {
         <Route
           element={
             <ProtectedRoute>
-              <AppLayout />
+              <AppLayout>
+                <Outlet />
+              </AppLayout>
             </ProtectedRoute>
           }
         >
@@ -48,24 +51,9 @@ export default function App() {
           <Route path="profile" element={<ProfilePage />} />
           <Route path="subscription" element={<SubscriptionPage />} />
           <Route path="stats" element={<StatsPage />} />
-          <Route
-            path="team"
-            element={
-             <ProtectedRoute requiredRole="admin">
-                <TeamPage />
-               </ProtectedRoute>
-             }
-          />
-          <Route
-            path="expenses"
-            element={
-              <ProtectedRoute requiredRole="admin">
-                <ExpensesPage />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="team" element={<TeamPage />} />
+          <Route path="expenses" element={<ExpensesPage />} />
         </Route>
-        <Route path="/setup" element={<SetupPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
