@@ -11,7 +11,7 @@ import { useSubscription } from '@/hooks/useSubscription'
 import { useRole } from '@/hooks/useRole'
 import { SubscriptionBanner } from './SubscriptionBanner'
 
-export function AppLayout({ children }: { children?: React.ReactNode }) {
+export function AppLayout() {
   const { signOut } = useAuth()
   const { profile } = useAuthStore()
   const { subscription } = useSubscription()
@@ -128,7 +128,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
       {/* Main content */}
       <main className={`lg:ml-64 pt-14 ${(isTrialing || isExpired) ? 'lg:pt-0 pt-24' : ''} pb-20 lg:pb-6`}>
         <div className="max-w-5xl mx-auto px-4 py-5">
-          {children ?? <Outlet />}
+          <Outlet />
         </div>
       </main>
 
