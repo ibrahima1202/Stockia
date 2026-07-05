@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import LoginPage from '@/pages/LoginPage'
@@ -34,9 +34,7 @@ export default function App() {
         <Route
           element={
             <ProtectedRoute>
-              <AppLayout>
-                <Outlet />
-              </AppLayout>
+              <AppLayout />
             </ProtectedRoute>
           }
         >
