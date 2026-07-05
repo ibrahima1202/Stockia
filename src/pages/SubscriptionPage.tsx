@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, Crown, Calendar, ArrowLeft, X, Users, Package, BarChart3, FileText, Headphones } from 'lucide-react'
+import { Check, Crown, Calendar, ArrowLeft, X, Users, Package, BarChart3, Headphones } from 'lucide-react'
 import { Card } from '@/components/ui/index'
 import { Button } from '@/components/ui/button'
 import { useSubscription } from '@/hooks/useSubscription'
@@ -57,17 +57,14 @@ const PLAN_DETAILS = {
 
 const colorMap = {
   blue: {
-    badge: 'bg-blue-100 text-blue-600',
     button: 'bg-blue-600 hover:bg-blue-700',
     icon: 'bg-blue-100 text-blue-600',
   },
   orange: {
-    badge: 'bg-orange-100 text-orange-600',
     button: 'bg-orange-500 hover:bg-orange-600',
     icon: 'bg-orange-100 text-orange-600',
   },
   purple: {
-    badge: 'bg-purple-100 text-purple-600',
     button: 'bg-purple-600 hover:bg-purple-700',
     icon: 'bg-purple-100 text-purple-600',
   },
@@ -82,15 +79,11 @@ export default function SubscriptionPage() {
   const isTrialing = subscription?.status === 'trial'
 
   const getPrice = (monthlyPrice: number) => {
-    if (billingPeriod === 'yearly') {
-      return monthlyPrice * 10 // 12 mois - 2 mois offerts = 10 mois
-    }
+    if (billingPeriod === 'yearly') return monthlyPrice * 10
     return monthlyPrice
   }
 
-  const getSavings = (monthlyPrice: number) => {
-    return monthlyPrice * 2 // 2 mois offerts
-  }
+  const getSavings = (monthlyPrice: number) => monthlyPrice * 2
 
   return (
     <div className="space-y-5">
@@ -247,7 +240,6 @@ export default function SubscriptionPage() {
                 )}
               </div>
 
-              {/* Détail des fonctionnalités */}
               {detail ? (
                 <ul className="space-y-2 flex-1 mb-5">
                   {detail.details.map((item, i) => (
@@ -304,7 +296,6 @@ export default function SubscriptionPage() {
         </p>
       </Card>
 
-      {/* Support */}
       <div className="flex items-center gap-2 justify-center text-xs text-muted-foreground">
         <Headphones className="h-3.5 w-3.5" />
         <p>Besoin d'aide ? Contactez-nous sur WhatsApp : <strong>+223 79 74 08 16</strong></p>
