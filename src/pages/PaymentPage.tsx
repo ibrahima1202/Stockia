@@ -10,7 +10,7 @@ import { useToast } from '@/store/toastStore'
 
 const WAVE_NUMBER = '+223 92347783'
 const ORANGE_NUMBER = '+223 92347783'
-const RECIPIENT_NAME = 'Ibrahima Sidibé'
+const RECIPIENT_NAME = 'Equipe STOCKAM'
 
 const FEDAPAY_PUBLIC_KEY = import.meta.env.VITE_FEDAPAY_PUBLIC_KEY as string
 const FEDAPAY_ENV = (import.meta.env.VITE_FEDAPAY_ENV as string) || 'sandbox'
