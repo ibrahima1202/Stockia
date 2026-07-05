@@ -4,12 +4,14 @@ import { Card, LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead
 import { Button } from '@/components/ui/button'
 import { useStats, type StatsPeriod } from '@/hooks/useStats'
 import { useSubscription } from '@/hooks/useSubscription'
+import { useRole } from '@/hooks/useRole'
 import { formatCurrency } from '@/lib/utils'
 import { BarChart3 } from 'lucide-react'
 
 export default function StatsPage() {
   const navigate = useNavigate()
   const { canAccessStats, isLoading: subLoading } = useSubscription()
+  const { canViewStats } = useRole()
   const {
     period, setPeriod, customStart, setCustomStart, customEnd, setCustomEnd,
     periodStats, fondsRoulement, isLoading, reload
@@ -24,17 +26,35 @@ export default function StatsPage() {
 
   if (isLoading || subLoading) return <LoadingScreen text="Calcul des statistiques..." />
 
+  // Blocage par rôle
+  if (!canViewStats) {
+    return (
+      <div className="space-y-5">
+        <button onClick={() => navigate('/')} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="h-4 w-4" /> Retour au tableau de bord
+        </button>
+        <div className="flex flex-col items-center justify-center py-16 space-y-5 text-center">
+          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center">
+            <Lock className="h-10 w-10 text-red-500" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">Accès non autorisé</h1>
+            <p className="text-sm text-muted-foreground mt-2 max-w-sm">
+              Vous n'avez pas les permissions nécessaires pour accéder aux statistiques.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // Blocage si pas plan Pro
   if (!canAccessStats) {
     return (
       <div className="space-y-5">
-        <button
-          onClick={() => navigate('/')}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
+        <button onClick={() => navigate('/')} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="h-4 w-4" /> Retour au tableau de bord
         </button>
-
         <div className="flex flex-col items-center justify-center py-16 space-y-5 text-center">
           <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center">
             <Lock className="h-10 w-10 text-orange-500" />
@@ -65,10 +85,7 @@ export default function StatsPage() {
                 </li>
               ))}
             </ul>
-            <Button
-              className="w-full"
-              onClick={() => navigate('/subscription')}
-            >
+            <Button className="w-full" onClick={() => navigate('/subscription')}>
               Passer au plan Pro
             </Button>
           </Card>
@@ -79,10 +96,7 @@ export default function StatsPage() {
 
   return (
     <div className="space-y-5">
-      <button
-        onClick={() => navigate('/')}
-        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
+      <button onClick={() => navigate('/')} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="h-4 w-4" /> Retour au tableau de bord
       </button>
 
@@ -104,9 +118,7 @@ export default function StatsPage() {
               key={p}
               onClick={() => setPeriod(p)}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                period === p
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                period === p ? 'bg-orange-500 text-white' : 'bg-muted text-muted-foreground hover:bg-muted/70'
               }`}
             >
               {periodLabels[p]}
@@ -117,21 +129,11 @@ export default function StatsPage() {
           <div className="flex gap-3">
             <div>
               <label className="text-xs text-muted-foreground">Du</label>
-              <input
-                type="date"
-                value={customStart}
-                onChange={(e) => setCustomStart(e.target.value)}
-                className="block h-9 rounded-md border border-input bg-background px-3 text-sm"
-              />
+              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="block h-9 rounded-md border border-input bg-background px-3 text-sm" />
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Au</label>
-              <input
-                type="date"
-                value={customEnd}
-                onChange={(e) => setCustomEnd(e.target.value)}
-                className="block h-9 rounded-md border border-input bg-background px-3 text-sm"
-              />
+              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="block h-9 rounded-md border border-input bg-background px-3 text-sm" />
             </div>
           </div>
         )}
