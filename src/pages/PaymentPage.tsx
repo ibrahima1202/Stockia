@@ -98,8 +98,9 @@ export default function PaymentPage() {
           <div className="bg-slate-50 rounded-lg px-4 py-3 text-sm text-slate-600">
             Référence : <strong className="font-mono">{reference}</strong>
           </div>
-
-          {/* Bouton WhatsApp après soumission */}
+          <Button className="w-full" variant="outline" onClick={() => navigate('/')}>
+            Retour à l'accueil
+          </Button>
           <button
             onClick={handleWhatsApp}
             className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-green-500 hover:bg-green-600 text-white rounded-xl font-semibold text-sm transition-colors"
@@ -107,10 +108,6 @@ export default function PaymentPage() {
             <MessageCircle className="h-5 w-5" />
             Notifier l'équipe sur WhatsApp
           </button>
-
-          <Button className="w-full" variant="outline" onClick={() => navigate('/')}>
-            Retour à l'accueil
-          </Button>
         </div>
       </div>
     )
@@ -239,15 +236,6 @@ export default function PaymentPage() {
               </p>
             </div>
 
-            {/* Bouton WhatsApp */}
-            <button
-              onClick={handleWhatsApp}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-green-500 hover:bg-green-600 text-white rounded-xl font-semibold text-sm transition-colors"
-            >
-              <MessageCircle className="h-5 w-5" />
-              Notifier l'équipe sur WhatsApp
-            </button>
-
             <Button
               className="w-full"
               onClick={handleSubmit}
@@ -256,6 +244,14 @@ export default function PaymentPage() {
             >
               Confirmer le paiement
             </Button>
+
+            <button
+              onClick={handleWhatsApp}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-green-500 hover:bg-green-600 text-white rounded-xl font-semibold text-sm transition-colors"
+            >
+              <MessageCircle className="h-5 w-5" />
+              Notifier l'équipe sur WhatsApp
+            </button>
 
             <p className="text-xs text-center text-muted-foreground">
               Votre abonnement sera activé dans les 24h après vérification du paiement.
