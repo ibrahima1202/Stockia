@@ -19,7 +19,6 @@ import type { Product } from '@/types'
 
 const productSchema = z.object({
   name: z.string().min(2, 'Nom requis'),
-  reference: z.string().min(1, 'Référence requise'),
   category_id: z.string().optional().nullable().transform(v => v === '' ? null : v),
   purchase_price: z.coerce.number().min(0, 'Prix invalide'),
   selling_price: z.coerce.number().min(0, 'Prix invalide'),
@@ -43,7 +42,6 @@ export default function ProductsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<Product | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  // Nouvelle catégorie
   const [showNewCategory, setShowNewCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
   const [categorySubmitting, setCategorySubmitting] = useState(false)
@@ -74,7 +72,7 @@ export default function ProductsPage() {
     setShowNewCategory(false)
     setNewCategoryName('')
     reset({
-      name: '', reference: '', category_id: null,
+      name: '', category_id: null,
       purchase_price: 0, selling_price: 0,
       stock_current: 0, stock_minimum: 5, is_active: true,
     })
@@ -88,7 +86,6 @@ export default function ProductsPage() {
     setNewCategoryName('')
     reset({
       name: product.name,
-      reference: product.reference,
       category_id: product.category_id ?? null,
       purchase_price: product.purchase_price,
       selling_price: product.selling_price,
@@ -104,6 +101,7 @@ export default function ProductsPage() {
     try {
       const payload = {
         ...data,
+        reference: editProduct?.reference ?? '',
         category_id: selectedCategoryId || null,
       }
       if (editProduct) {
@@ -112,13 +110,8 @@ export default function ProductsPage() {
         await createProduct(payload)
       }
       setModalOpen(false)
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : ''
-      if (msg.includes('duplicate') || msg.includes('unique') || msg.includes('conflict') || msg.includes('409')) {
-        toast.error('Référence déjà utilisée', 'Ce code référence existe déjà. Utilisez une référence différente.')
-      } else {
-        toast.error('Erreur', 'Impossible de créer le produit. Vérifiez les informations.')
-      }
+    } catch {
+      toast.error('Erreur', 'Impossible de créer le produit.')
     } finally {
       setSubmitting(false)
     }
@@ -280,10 +273,9 @@ export default function ProductsPage() {
             <div className="col-span-2">
               <Input label="Nom du produit" error={errors.name?.message} required {...register('name')} />
             </div>
-            <Input label="Référence" error={errors.reference?.message} required {...register('reference')} />
 
             {/* Catégorie + ajout rapide */}
-            <div className="space-y-1.5">
+            <div className="col-span-2 space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="block text-sm font-medium text-foreground">Catégorie</label>
                 <button
