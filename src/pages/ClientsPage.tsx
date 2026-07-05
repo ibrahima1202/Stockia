@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { useClients } from '@/hooks/useClients'
 import { useSubscription } from '@/hooks/useSubscription'
+import { useRole } from '@/hooks/useRole'
 import { formatCurrency } from '@/lib/utils'
 import { useNavigate } from 'react-router-dom'
 import type { Client, PaymentMethod } from '@/types'
@@ -15,15 +16,14 @@ import type { Client, PaymentMethod } from '@/types'
 export default function ClientsPage() {
   const { clients, isLoading, createClient, updateClient, deleteClient, addReglement } = useClients()
   const { canAccessClientsAndFournisseurs, isLoading: subLoading } = useSubscription()
+  const { canViewClients, canManageClients } = useRole()
   const navigate = useNavigate()
 
-  // Modal création/édition
   const [showForm, setShowForm] = useState(false)
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [formData, setFormData] = useState({ name: '', phone: '', address: '', notes: '' })
   const [formSubmitting, setFormSubmitting] = useState(false)
 
-  // Modal règlement
   const [reglementClient, setReglementClient] = useState<Client | null>(null)
   const [reglementMontant, setReglementMontant] = useState('')
   const [reglementMethod, setReglementMethod] = useState<PaymentMethod>('especes')
@@ -134,6 +134,23 @@ export default function ClientsPage() {
     )
   }
 
+  // Blocage par rôle
+  if (!canViewClients) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 space-y-4 text-center">
+        <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center">
+          <Lock className="h-10 w-10 text-red-500" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Accès non autorisé</h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            Vous n'avez pas les permissions pour accéder aux clients.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-5">
       <div className="page-header">
@@ -141,9 +158,11 @@ export default function ClientsPage() {
           <h1 className="page-title">Clients</h1>
           <p className="text-sm text-muted-foreground">{clients.length} client(s)</p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4" /> Nouveau client
-        </Button>
+        {canManageClients && (
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4" /> Nouveau client
+          </Button>
+        )}
       </div>
 
       {/* Résumé */}
@@ -169,7 +188,7 @@ export default function ClientsPage() {
                 <TableHead>Client</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead className="text-right">Solde dû</TableHead>
-                <TableHead></TableHead>
+                {canManageClients && <TableHead></TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -199,33 +218,35 @@ export default function ClientsPage() {
                       <Badge variant="success">À jour</Badge>
                     )}
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1 justify-end">
-                      {client.solde > 0 && (
+                  {canManageClients && (
+                    <TableCell>
+                      <div className="flex items-center gap-1 justify-end">
+                        {client.solde > 0 && (
+                          <button
+                            onClick={() => setReglementClient(client)}
+                            className="p-1.5 hover:bg-green-50 rounded text-green-600"
+                            title="Enregistrer un règlement"
+                          >
+                            <Wallet className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                         <button
-                          onClick={() => setReglementClient(client)}
-                          className="p-1.5 hover:bg-green-50 rounded text-green-600 text-xs font-medium"
-                          title="Enregistrer un règlement"
+                          onClick={() => openEdit(client)}
+                          className="p-1.5 hover:bg-blue-50 rounded text-blue-500"
+                          title="Modifier"
                         >
-                          <Wallet className="h-3.5 w-3.5" />
+                          <Pencil className="h-3.5 w-3.5" />
                         </button>
-                      )}
-                      <button
-                        onClick={() => openEdit(client)}
-                        className="p-1.5 hover:bg-blue-50 rounded text-blue-500"
-                        title="Modifier"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(client.id)}
-                        className="p-1.5 hover:bg-red-50 rounded text-red-400"
-                        title="Supprimer"
-                      >
-                        <XCircle className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </TableCell>
+                        <button
+                          onClick={() => handleDelete(client.id)}
+                          className="p-1.5 hover:bg-red-50 rounded text-red-400"
+                          title="Supprimer"
+                        >
+                          <XCircle className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -234,7 +255,7 @@ export default function ClientsPage() {
       </div>
 
       {/* Modal création/édition */}
-      {showForm && (
+      {showForm && canManageClients && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
             <h2 className="font-semibold text-lg">
@@ -294,7 +315,7 @@ export default function ClientsPage() {
       )}
 
       {/* Modal règlement */}
-      {reglementClient && (
+      {reglementClient && canManageClients && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
             <h2 className="font-semibold text-lg">Règlement client</h2>
