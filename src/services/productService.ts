@@ -54,17 +54,24 @@ export const productService = {
     return data
   },
 
-  async create(
-    product: Omit<Product, 'id' | 'created_at' | 'updated_at' | 'category'>
-  ): Promise<Product> {
-    const { data, error } = await supabase
-      .from('products')
-      .insert({ ...product, business_id: getBusinessId() })
-      .select('*, category:categories(*)')
-      .single()
-    if (error) throw error
-    return data
-  },
+ async create(
+  product: Omit<Product, 'id' | 'created_at' | 'updated_at' | 'category'>
+): Promise<Product> {
+  // Générer une référence automatique
+  const { data: existing } = await supabase
+    .from('products')
+    .select('id')
+  const count = (existing?.length ?? 0) + 1
+  const reference = `PRD-${String(count).padStart(4, '0')}`
+
+  const { data, error } = await supabase
+    .from('products')
+    .insert({ ...product, reference })
+    .select('*, category:categories(*)')
+    .single()
+  if (error) throw error
+  return data
+},
 
   async update(
     id: string,
