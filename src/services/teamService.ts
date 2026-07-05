@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import type { Profile } from '@/types'
+import type { Profile, UserRole } from '@/types'
 
 export const teamService = {
   async getTeamMembers(businessId: string): Promise<Profile[]> {
@@ -12,7 +12,7 @@ export const teamService = {
     return data
   },
 
-  async updateRole(userId: string, role: 'admin' | 'caissier'): Promise<Profile> {
+  async updateRole(userId: string, role: UserRole): Promise<Profile> {
     const { data, error } = await supabase
       .from('profiles')
       .update({ role })
