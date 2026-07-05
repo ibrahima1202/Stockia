@@ -1,7 +1,7 @@
 // ============================================================
 // QUINCAILLERIE PRO — Types TypeScript
 // ============================================================
-export type UserRole = 'admin' | 'caissier'
+export type UserRole = 'admin' | 'caissier' | 'magasinier' | 'promoteur'
 export interface Profile {
   id: string
   full_name: string
