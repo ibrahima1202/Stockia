@@ -13,7 +13,7 @@ export default function PaymentPage() {
   const [searchParams] = useSearchParams()
   const planId = searchParams.get('plan')
   const period = searchParams.get('period') ?? 'monthly'
-  const { plans, subscription } = useSubscription()
+  const { plans, subscription, isLoading } = useSubscription()
   const { profile } = useAuthStore()
 
   const plan = plans.find((p) => p.id === planId)
@@ -73,6 +73,19 @@ export default function PaymentPage() {
     }
   }
 
+  // Chargement en cours
+  if (isLoading || plans.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Chargement...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Plan introuvable après chargement
   if (!plan) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
