@@ -30,10 +30,9 @@ type ProductForm = z.infer<typeof productSchema>
 
 export default function ProductsPage() {
   const { products, categories, isLoading, createProduct, updateProduct, deleteProduct, createCategory } = useProducts()
-  const { profile } = useAuthStore()
+  const { canManageProducts, canExportPDFRole } = useRole()
   const { canExportPDF, business } = useSubscription()
   const toast = useToast()
-  const isAdmin = profile?.role === 'admin'
 
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
@@ -136,6 +135,8 @@ export default function ProductsPage() {
     pdfService.exportStock(filtered, business?.name ?? 'Mon Commerce')
   }
 
+  const canExport = canExportPDF && canExportPDFRole
+
   if (isLoading) return <LoadingScreen text="Chargement des produits..." />
 
   return (
@@ -146,7 +147,7 @@ export default function ProductsPage() {
           <p className="text-sm text-muted-foreground">{products.length} produit(s)</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {canExportPDF ? (
+          {canExport ? (
             <Button variant="outline" onClick={handleExportStock} disabled={filtered.length === 0} title="Rapport PDF">
               <FileDown className="h-4 w-4" />
               <span className="hidden sm:inline">Rapport PDF</span>
@@ -157,7 +158,7 @@ export default function ProductsPage() {
               <span className="hidden sm:inline">PDF (Pro)</span>
             </button>
           )}
-          {isAdmin && (
+          {canManageProducts && (
             <Button onClick={openCreate}>
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Nouveau produit</span>
@@ -200,7 +201,7 @@ export default function ProductsPage() {
             icon={Package}
             title="Aucun produit trouvé"
             description={search ? 'Essayez un autre terme de recherche' : 'Commencez par créer un produit'}
-            action={isAdmin ? <Button onClick={openCreate}><Plus className="h-4 w-4" /> Créer un produit</Button> : undefined}
+            action={canManageProducts ? <Button onClick={openCreate}><Plus className="h-4 w-4" /> Créer un produit</Button> : undefined}
           />
         ) : (
           <Table>
@@ -212,7 +213,7 @@ export default function ProductsPage() {
                 <TableHead className="text-right">Prix vente</TableHead>
                 <TableHead className="text-right">Stock</TableHead>
                 <TableHead>Statut</TableHead>
-                {isAdmin && <TableHead className="text-right">Actions</TableHead>}
+                {canManageProducts && <TableHead className="text-right">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -241,7 +242,7 @@ export default function ProductsPage() {
                         {p.is_active ? 'Actif' : 'Inactif'}
                       </Badge>
                     </TableCell>
-                    {isAdmin && (
+                    {canManageProducts && (
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button onClick={() => openEdit(p)} className="p-1.5 rounded hover:bg-muted transition-colors">
@@ -262,94 +263,95 @@ export default function ProductsPage() {
       </div>
 
       {/* Create/Edit Modal */}
-      <Modal
-        open={modalOpen}
-        onClose={() => { setModalOpen(false); setShowNewCategory(false); setNewCategoryName('') }}
-        title={editProduct ? 'Modifier le produit' : 'Nouveau produit'}
-        size="lg"
-      >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <Input label="Nom du produit" error={errors.name?.message} required {...register('name')} />
-            </div>
-
-            {/* Catégorie + ajout rapide */}
-            <div className="col-span-2 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-foreground">Catégorie</label>
-                <button
-                  type="button"
-                  onClick={() => setShowNewCategory(!showNewCategory)}
-                  className="text-xs text-orange-500 hover:underline flex items-center gap-1"
-                >
-                  <Plus className="h-3 w-3" /> Nouvelle catégorie
-                </button>
+      {canManageProducts && (
+        <Modal
+          open={modalOpen}
+          onClose={() => { setModalOpen(false); setShowNewCategory(false); setNewCategoryName('') }}
+          title={editProduct ? 'Modifier le produit' : 'Nouveau produit'}
+          size="lg"
+        >
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <Input label="Nom du produit" error={errors.name?.message} required {...register('name')} />
               </div>
 
-              {showNewCategory && (
-                <div className="flex gap-2 mb-2">
-                  <input
-                    type="text"
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    placeholder="Nom de la catégorie..."
-                    className="flex-1 h-8 rounded-md border border-orange-300 bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-orange-400"
-                    autoFocus
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateCategory()}
-                  />
+              <div className="col-span-2 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-medium text-foreground">Catégorie</label>
                   <button
                     type="button"
-                    onClick={handleCreateCategory}
-                    disabled={categorySubmitting || !newCategoryName.trim()}
-                    className="h-8 px-3 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-xs font-medium disabled:opacity-50 transition-colors"
+                    onClick={() => setShowNewCategory(!showNewCategory)}
+                    className="text-xs text-orange-500 hover:underline flex items-center gap-1"
                   >
-                    {categorySubmitting ? '...' : 'Créer'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowNewCategory(false); setNewCategoryName('') }}
-                    className="h-8 w-8 flex items-center justify-center hover:bg-muted rounded-md"
-                  >
-                    <X className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Plus className="h-3 w-3" /> Nouvelle catégorie
                   </button>
                 </div>
-              )}
 
-              <select
-                value={selectedCategoryId}
-                onChange={(e) => {
-                  setSelectedCategoryId(e.target.value)
-                  setValue('category_id', e.target.value || null)
-                }}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <option value="">Sans catégorie</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+                {showNewCategory && (
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Nom de la catégorie..."
+                      className="flex-1 h-8 rounded-md border border-orange-300 bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-orange-400"
+                      autoFocus
+                      onKeyDown={(e) => e.key === 'Enter' && handleCreateCategory()}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCreateCategory}
+                      disabled={categorySubmitting || !newCategoryName.trim()}
+                      className="h-8 px-3 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-xs font-medium disabled:opacity-50 transition-colors"
+                    >
+                      {categorySubmitting ? '...' : 'Créer'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowNewCategory(false); setNewCategoryName('') }}
+                      className="h-8 w-8 flex items-center justify-center hover:bg-muted rounded-md"
+                    >
+                      <X className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  </div>
+                )}
+
+                <select
+                  value={selectedCategoryId}
+                  onChange={(e) => {
+                    setSelectedCategoryId(e.target.value)
+                    setValue('category_id', e.target.value || null)
+                  }}
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="">Sans catégorie</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <Input label="Prix d'achat (XOF)" type="number" step="1" error={errors.purchase_price?.message} required {...register('purchase_price')} />
+              <Input label="Prix de vente (XOF)" type="number" step="1" error={errors.selling_price?.message} required {...register('selling_price')} />
+              <Input label="Stock actuel" type="number" error={errors.stock_current?.message} required {...register('stock_current')} />
+              <Input label="Stock minimum" type="number" error={errors.stock_minimum?.message} required {...register('stock_minimum')} />
             </div>
-
-            <Input label="Prix d'achat (XOF)" type="number" step="1" error={errors.purchase_price?.message} required {...register('purchase_price')} />
-            <Input label="Prix de vente (XOF)" type="number" step="1" error={errors.selling_price?.message} required {...register('selling_price')} />
-            <Input label="Stock actuel" type="number" error={errors.stock_current?.message} required {...register('stock_current')} />
-            <Input label="Stock minimum" type="number" error={errors.stock_minimum?.message} required {...register('stock_minimum')} />
-          </div>
-          <div className="flex items-center gap-2">
-            <input type="checkbox" id="is_active" {...register('is_active')} className="rounded border-input" />
-            <label htmlFor="is_active" className="text-sm">Produit actif</label>
-          </div>
-          <div className="flex gap-2 pt-2">
-            <Button type="submit" isLoading={submitting} className="flex-1">
-              {editProduct ? 'Mettre à jour' : 'Créer le produit'}
-            </Button>
-            <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
-              Annuler
-            </Button>
-          </div>
-        </form>
-      </Modal>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="is_active" {...register('is_active')} className="rounded border-input" />
+              <label htmlFor="is_active" className="text-sm">Produit actif</label>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button type="submit" isLoading={submitting} className="flex-1">
+                {editProduct ? 'Mettre à jour' : 'Créer le produit'}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
+                Annuler
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
       {/* Delete confirmation */}
       <Modal
