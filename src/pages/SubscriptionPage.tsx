@@ -292,13 +292,13 @@ export default function SubscriptionPage() {
       <Card className="p-4 bg-slate-50 space-y-2">
         <p className="text-sm font-semibold text-slate-700">💳 Comment payer ?</p>
         <p className="text-xs text-slate-600">
-          Envoyez le montant correspondant à votre plan via <strong>Wave</strong> ou <strong>Orange Money</strong> au numéro <strong>79740816</strong> (Ibrahima Sidibé), puis soumettez la référence de transaction. Votre abonnement sera activé dans les 24h.
+          Envoyez le montant correspondant à votre plan via <strong>Wave</strong> ou <strong>Orange Money</strong> au numéro <strong>+223 92347783</strong> (Equipe Stockam), puis soumettez la référence de transaction. Votre abonnement sera activé dans les 24h.
         </p>
       </Card>
 
       <div className="flex items-center gap-2 justify-center text-xs text-muted-foreground">
         <Headphones className="h-3.5 w-3.5" />
-        <p>Besoin d'aide ? Contactez-nous sur WhatsApp : <strong>+223 79 74 08 16</strong></p>
+        <p>Besoin d'aide ? Contactez-nous sur WhatsApp : <strong>+223 92347783</strong></p>
       </div>
 
       <p className="text-xs text-center text-muted-foreground">
