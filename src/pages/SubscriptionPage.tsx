@@ -88,13 +88,6 @@ export default function SubscriptionPage() {
     return monthlyPrice
   }
 
-  const getPriceLabel = (monthlyPrice: number) => {
-    if (billingPeriod === 'yearly') {
-      return `${formatCurrency(monthlyPrice * 10)}/an`
-    }
-    return `${formatCurrency(monthlyPrice)}/mois`
-  }
-
   const getSavings = (monthlyPrice: number) => {
     return monthlyPrice * 2 // 2 mois offerts
   }
