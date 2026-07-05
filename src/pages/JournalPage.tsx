@@ -7,6 +7,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { useJournal } from '@/hooks/useJournal'
 import { useSubscription } from '@/hooks/useSubscription'
+import { useRole } from '@/hooks/useRole'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { pdfService } from '@/services/pdfService'
@@ -23,21 +24,39 @@ export default function JournalPage() {
   const [dateTo, setDateTo] = useState(format(endOfMonth(today), 'yyyy-MM-dd'))
   const { entries, isLoading, reload } = useJournal()
   const { canExportPDF, business } = useSubscription()
+  const { canViewJournal, canExportPDFRole } = useRole()
 
   const totalDebit = entries.reduce((s, e) => s + e.debit, 0)
   const totalCredit = entries.reduce((s, e) => s + e.credit, 0)
   const lastBalance = entries.length > 0 ? entries[0].balance : 0
 
-  const handleFilter = () => {
-    reload(dateFrom, dateTo)
-  }
+  const handleFilter = () => reload(dateFrom, dateTo)
 
   const handleExportPDF = () => {
     const period = `${dateFrom} au ${dateTo}`
     pdfService.exportJournal(entries, business?.name ?? 'Mon Commerce', period)
   }
 
+  const canExport = canExportPDF && canExportPDFRole
+
   if (isLoading) return <LoadingScreen text="Chargement du journal..." />
+
+  // Blocage par rôle
+  if (!canViewJournal) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 space-y-4 text-center">
+        <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center">
+          <Lock className="h-10 w-10 text-red-500" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Accès non autorisé</h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            Vous n'avez pas les permissions pour accéder au journal comptable.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -46,7 +65,7 @@ export default function JournalPage() {
           <h1 className="page-title">Livre Journal</h1>
           <p className="text-sm text-muted-foreground">{entries.length} écriture(s)</p>
         </div>
-        {canExportPDF ? (
+        {canExport ? (
           <Button onClick={handleExportPDF} disabled={entries.length === 0}>
             <FileDown className="h-4 w-4" />
             <span className="hidden sm:inline">Exporter PDF</span>
@@ -54,7 +73,6 @@ export default function JournalPage() {
           </Button>
         ) : (
           <button
-            onClick={() => {}}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-dashed border-slate-300 text-slate-400 text-sm cursor-not-allowed"
             title="Fonctionnalité Pro"
           >
@@ -102,9 +120,7 @@ export default function JournalPage() {
               className="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
           </div>
-          <Button onClick={handleFilter} variant="outline" size="sm">
-            Filtrer
-          </Button>
+          <Button onClick={handleFilter} variant="outline" size="sm">Filtrer</Button>
           <Button
             variant="ghost"
             size="sm"
