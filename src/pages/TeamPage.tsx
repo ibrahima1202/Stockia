@@ -6,6 +6,25 @@ import { useTeam } from '@/hooks/useTeam'
 import { useAuthStore } from '@/store/authStore'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useToast } from '@/store/toastStore'
+import type { UserRole } from '@/types'
+
+const ROLES: { value: UserRole; label: string; description: string }[] = [
+  { value: 'admin', label: 'Admin', description: 'Accès complet à toutes les fonctionnalités' },
+  { value: 'caissier', label: 'Caissier', description: 'Ventes, clients, fournisseurs, dépenses, journal' },
+  { value: 'magasinier', label: 'Magasinier', description: 'Gestion des produits et du stock uniquement' },
+  { value: 'promoteur', label: 'Promoteur', description: 'Lecture seule de toutes les sections' },
+]
+
+const getRoleBadgeVariant = (role: string) => {
+  if (role === 'admin') return 'info'
+  if (role === 'caissier') return 'success'
+  if (role === 'magasinier') return 'warning'
+  return 'default'
+}
+
+const getRoleLabel = (role: string) => {
+  return ROLES.find((r) => r.value === role)?.label ?? role
+}
 
 export default function TeamPage() {
   const { members, isLoading, updateRole, toggleActive, createMember } = useTeam()
@@ -20,18 +39,37 @@ export default function TeamPage() {
   // Modal création membre
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState({
-    fullName: '', email: '', password: '', role: 'caissier' as 'admin' | 'caissier'
+    fullName: '', email: '', password: '', role: 'caissier' as UserRole
   })
   const [showPassword, setShowPassword] = useState(false)
   const [formSubmitting, setFormSubmitting] = useState(false)
 
-  const handleRoleToggle = async (userId: string, currentRole: string) => {
-    const newRole = currentRole === 'admin' ? 'caissier' : 'admin'
-    await updateRole(userId, newRole as 'admin' | 'caissier')
-  }
+  // Modal changement de rôle
+  const [editingRole, setEditingRole] = useState<{ userId: string; currentRole: string } | null>(null)
+  const [newRole, setNewRole] = useState<UserRole>('caissier')
+  const [roleSubmitting, setRoleSubmitting] = useState(false)
 
   const handleToggleActive = async (userId: string, isActive: boolean) => {
     await toggleActive(userId, !isActive)
+  }
+
+  const openRoleEdit = (userId: string, currentRole: string) => {
+    setEditingRole({ userId, currentRole })
+    setNewRole(currentRole as UserRole)
+  }
+
+  const handleRoleUpdate = async () => {
+    if (!editingRole) return
+    setRoleSubmitting(true)
+    try {
+      await updateRole(editingRole.userId, newRole)
+      setEditingRole(null)
+      toast.success('Rôle mis à jour !')
+    } catch {
+      toast.error('Erreur', 'Impossible de mettre à jour le rôle')
+    } finally {
+      setRoleSubmitting(false)
+    }
   }
 
   const openCreate = () => {
@@ -81,6 +119,19 @@ export default function TeamPage() {
         </Button>
       </div>
 
+      {/* Description des rôles */}
+      <Card className="p-4 space-y-2">
+        <p className="text-sm font-semibold text-slate-700">Rôles disponibles</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {ROLES.map((r) => (
+            <div key={r.value} className="flex items-start gap-2">
+              <Badge variant={getRoleBadgeVariant(r.value)}>{r.label}</Badge>
+              <p className="text-xs text-muted-foreground">{r.description}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
+
       {limitReached && (
         <Card className="p-4 bg-orange-50 border-orange-200">
           <p className="text-sm text-orange-700">
@@ -115,8 +166,8 @@ export default function TeamPage() {
                       </p>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={member.role === 'admin' ? 'info' : 'success'}>
-                        {member.role === 'admin' ? 'Admin' : 'Caissier'}
+                      <Badge variant={getRoleBadgeVariant(member.role)}>
+                        {getRoleLabel(member.role)}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -128,11 +179,11 @@ export default function TeamPage() {
                       {!isMe && (
                         <div className="flex items-center gap-1 justify-end">
                           <button
-                            onClick={() => handleRoleToggle(member.id, member.role)}
+                            onClick={() => openRoleEdit(member.id, member.role)}
                             className="p-1.5 hover:bg-blue-50 rounded text-blue-500"
-                            title={member.role === 'admin' ? 'Rétrograder en caissier' : 'Promouvoir admin'}
+                            title="Changer le rôle"
                           >
-                            {member.role === 'admin' ? <ShieldOff className="h-3.5 w-3.5" /> : <Shield className="h-3.5 w-3.5" />}
+                            <Shield className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={() => handleToggleActive(member.id, isActive)}
@@ -151,6 +202,41 @@ export default function TeamPage() {
           </Table>
         )}
       </div>
+
+      {/* Modal changement de rôle */}
+      {editingRole && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 space-y-4">
+            <h2 className="font-semibold text-lg">Changer le rôle</h2>
+            <div className="space-y-2">
+              {ROLES.map((r) => (
+                <button
+                  key={r.value}
+                  onClick={() => setNewRole(r.value)}
+                  className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-colors ${
+                    newRole === r.value
+                      ? 'border-orange-500 bg-orange-50'
+                      : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Badge variant={getRoleBadgeVariant(r.value)}>{r.label}</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">{r.description}</p>
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setEditingRole(null)}>
+                Annuler
+              </Button>
+              <Button className="flex-1" onClick={handleRoleUpdate} isLoading={roleSubmitting}>
+                Confirmer
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal création membre */}
       {showForm && (
@@ -204,11 +290,12 @@ export default function TeamPage() {
                 <label className="block text-sm font-medium mb-1">Rôle *</label>
                 <select
                   value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'caissier' })}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
                   className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
-                  <option value="caissier">Caissier</option>
-                  <option value="admin">Admin</option>
+                  {ROLES.map((r) => (
+                    <option key={r.value} value={r.value}>{r.label} — {r.description}</option>
+                  ))}
                 </select>
               </div>
             </div>
