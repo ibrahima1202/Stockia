@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useStocks } from '@/hooks/useStocks'
 import { useProducts } from '@/hooks/useProducts'
 import { useRole } from '@/hooks/useRole'
-import { formatCurrency, formatDateTime } from '@/lib/utils'
+import { formatDateTime } from '@/lib/utils'
 import { useToast } from '@/store/toastStore'
 
 export default function StocksPage() {
