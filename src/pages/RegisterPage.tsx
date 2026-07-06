@@ -73,7 +73,17 @@ export default function RegisterPage() {
       navigate('/')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erreur lors de l\'inscription'
-      setError(msg)
+      if (
+        msg.toLowerCase().includes('already registered') ||
+        msg.toLowerCase().includes('already exists') ||
+        msg.toLowerCase().includes('user already') ||
+        msg.toLowerCase().includes('email')
+      ) {
+        setError('Un compte existe déjà avec cet email. Connectez-vous ou réinitialisez votre mot de passe.')
+        setStep(0)
+      } else {
+        setError(msg)
+      }
     } finally {
       setIsLoading(false)
     }
@@ -199,7 +209,24 @@ export default function RegisterPage() {
                   </div>
                 </div>
               </div>
-              {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">{error}</p>}
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2 space-y-1">
+                  <p className="text-sm text-red-500">{error}</p>
+                  {error.includes('compte existe') && (
+                    <div className="flex gap-3">
+                      <Link to="/login" className="text-sm text-orange-500 font-semibold hover:underline">
+                        Se connecter →
+                      </Link>
+                      <span className="text-slate-300">|</span>
+                      <Link to="/login" className="text-sm text-slate-500 hover:underline">
+                        Mot de passe oublié ?
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <button
                 onClick={handleStep1}
                 className="w-full h-10 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-sm font-semibold transition-colors"
@@ -263,7 +290,18 @@ export default function RegisterPage() {
                   </div>
                 </div>
               </div>
-              {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">{error}</p>}
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                  <p className="text-sm text-red-500">{error}</p>
+                  {error.includes('compte existe') && (
+                    <Link to="/login" className="text-sm text-orange-500 font-semibold hover:underline">
+                      Se connecter →
+                    </Link>
+                  )}
+                </div>
+              )}
+
               <div className="flex gap-2">
                 <button
                   onClick={() => { setStep(0); setError('') }}
