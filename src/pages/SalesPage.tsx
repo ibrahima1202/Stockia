@@ -85,7 +85,6 @@ export default function SalesPage() {
   const [activeTab, setActiveTab] = useState<'list' | 'new'>('list')
   const [selectedProductId, setSelectedProductId] = useState('')
   const [selectedUnit, setSelectedUnit] = useState<ProductUnit | null>(null)
-  const [selectedUnitPrice, setSelectedUnitPrice] = useState(0)
   const [qty, setQty] = useState(1)
   const [productSearch, setProductSearch] = useState('')
   const [showProductDropdown, setShowProductDropdown] = useState(false)
