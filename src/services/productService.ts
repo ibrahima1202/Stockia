@@ -59,10 +59,11 @@ export const productService = {
   ): Promise<Product> {
     const businessId = getBusinessId()
 
-    // Générer une référence automatique
+    // Compter uniquement les produits de ce commerce
     const { data: existing } = await supabase
       .from('products')
       .select('id')
+      .eq('business_id', businessId)
     const count = (existing?.length ?? 0) + 1
     const reference = `PRD-${String(count).padStart(4, '0')}`
 
