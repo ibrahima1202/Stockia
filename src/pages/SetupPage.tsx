@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Building2, Phone, MapPin } from 'lucide-react'
+import { Building2, Phone, MapPin, ShoppingBag, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useAuthStore } from '@/store/authStore'
@@ -11,6 +11,7 @@ export default function SetupPage() {
   const [businessName, setBusinessName] = useState('')
   const [businessPhone, setBusinessPhone] = useState('')
   const [businessCity, setBusinessCity] = useState('')
+  const [commerceType, setCommerceType] = useState<'detail' | 'gros_detail'>('detail')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -26,12 +27,15 @@ export default function SetupPage() {
       if (!businessPlan) throw new Error('Plan introuvable')
 
       await createBusiness(
-  { name: businessName, phone: businessPhone, city: businessCity },
-  businessPlan.id
-)
-// Attendre un peu pour que Supabase mette à jour le profil
-await new Promise(resolve => setTimeout(resolve, 1000))
-window.location.href = '/'
+        {
+          name: businessName,
+          phone: businessPhone,
+          city: businessCity,
+          commerce_type: commerceType,
+        },
+        businessPlan.id
+      )
+      window.location.href = '/'
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la création')
     } finally {
@@ -69,6 +73,53 @@ window.location.href = '/'
           <p className="text-sm text-slate-500 mt-0.5">
             Configurez votre commerce pour commencer
           </p>
+        </div>
+
+        {/* Type de commerce */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-slate-700">
+            Type de vente *
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setCommerceType('detail')}
+              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors text-left ${
+                commerceType === 'detail'
+                  ? 'border-orange-500 bg-orange-50'
+                  : 'border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <Package className={`h-6 w-6 ${commerceType === 'detail' ? 'text-orange-500' : 'text-slate-400'}`} />
+              <div>
+                <p className={`text-sm font-semibold ${commerceType === 'detail' ? 'text-orange-600' : 'text-slate-700'}`}>
+                  Vente au détail
+                </p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Vente à l'unité uniquement
+                </p>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCommerceType('gros_detail')}
+              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors text-left ${
+                commerceType === 'gros_detail'
+                  ? 'border-orange-500 bg-orange-50'
+                  : 'border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <ShoppingBag className={`h-6 w-6 ${commerceType === 'gros_detail' ? 'text-orange-500' : 'text-slate-400'}`} />
+              <div>
+                <p className={`text-sm font-semibold ${commerceType === 'gros_detail' ? 'text-orange-600' : 'text-slate-700'}`}>
+                  Gros & Détail
+                </p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Carton, pack, pièce...
+                </p>
+              </div>
+            </button>
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -132,4 +183,4 @@ window.location.href = '/'
       </div>
     </div>
   )
-      }
+}
