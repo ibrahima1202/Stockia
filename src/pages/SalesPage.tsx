@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Plus, Minus, Trash2, ShoppingCart, Receipt, Pencil, XCircle, User, Lock, Search, FileDown, Tag, UserPlus } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
@@ -12,10 +12,58 @@ import { useClients } from '@/hooks/useClients'
 import { useReadOnly } from '@/hooks/useReadOnly'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useRole } from '@/hooks/useRole'
+import { useCommerceType } from '@/hooks/useCommerceType'
+import { useProductUnits } from '@/hooks/useProductUnits'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
-import type { Sale, SaleCartItem, PaymentMethod, SaleStatut, Product, DiscountType } from '@/types'
+import type { Sale, SaleCartItem, PaymentMethod, SaleStatut, Product, DiscountType, ProductUnit } from '@/types'
 import { useToast } from '@/store/toastStore'
 import { pdfService } from '@/services/pdfService'
+
+// Composant sélecteur d'unité pour gros & détail
+function UnitSelector({
+  product,
+  onSelect,
+}: {
+  product: Product
+  onSelect: (unit: ProductUnit | null, price: number) => void
+}) {
+  const { units } = useProductUnits(product.id)
+  const [selectedUnitId, setSelectedUnitId] = useState<string>('')
+
+  useEffect(() => {
+    setSelectedUnitId('')
+    onSelect(null, product.selling_price)
+  }, [product.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleChange = (unitId: string) => {
+    setSelectedUnitId(unitId)
+    if (!unitId) {
+      onSelect(null, product.selling_price)
+    } else {
+      const unit = units.find((u) => u.id === unitId)
+      if (unit) onSelect(unit, unit.selling_price)
+    }
+  }
+
+  if (units.length === 0) return null
+
+  return (
+    <div className="mt-1">
+      <select
+        value={selectedUnitId}
+        onChange={(e) => handleChange(e.target.value)}
+        className="w-full h-7 rounded border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        <option value="">{product.base_unit || 'Pièce'} — {formatCurrency(product.selling_price)}</option>
+        {units.map((unit) => (
+          <option key={unit.id} value={unit.id}>
+            {unit.unit_name} ({unit.conversion_rate} {product.base_unit || 'pcs'}) — {formatCurrency(unit.selling_price)}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
 
 export default function SalesPage() {
   const { sales, isLoading, createSale, deleteSale, updateSale } = useSales()
@@ -25,6 +73,7 @@ export default function SalesPage() {
   const { isReadOnly } = useReadOnly()
   const { canExportPDF, business } = useSubscription()
   const { canManageSales, canCreateSale, canCancelSale, canApplyDiscount, canExportPDFRole } = useRole()
+  const { isGrosDetail } = useCommerceType()
 
   const [cart, setCart] = useState<SaleCartItem[]>([])
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('especes')
@@ -35,6 +84,8 @@ export default function SalesPage() {
   const [submitting, setSubmitting] = useState(false)
   const [activeTab, setActiveTab] = useState<'list' | 'new'>('list')
   const [selectedProductId, setSelectedProductId] = useState('')
+  const [selectedUnit, setSelectedUnit] = useState<ProductUnit | null>(null)
+  const [selectedUnitPrice, setSelectedUnitPrice] = useState(0)
   const [qty, setQty] = useState(1)
   const [productSearch, setProductSearch] = useState('')
   const [showProductDropdown, setShowProductDropdown] = useState(false)
@@ -72,6 +123,7 @@ export default function SalesPage() {
 
   const selectedProduct = products.find((p) => p.id === selectedProductId)
   const subtotal = cart.reduce((sum, item) => sum + item.total_price, 0)
+
   const discountAmount = useMemo(() => {
     if (!discountValue || !showDiscount) return 0
     const val = parseFloat(discountValue)
@@ -79,6 +131,7 @@ export default function SalesPage() {
     if (discountType === 'percent') return Math.round(subtotal * val / 100)
     return Math.min(val, subtotal)
   }, [discountValue, discountType, subtotal, showDiscount])
+
   const cartTotal = Math.max(0, subtotal - discountAmount)
   const montantDu = statut === 'credit' ? cartTotal : statut === 'partiel' ? cartTotal - (parseFloat(montantPaye) || 0) : 0
 
@@ -89,48 +142,81 @@ export default function SalesPage() {
     setSelectedProductId(product.id)
     setProductSearch(product.name)
     setShowProductDropdown(false)
+    setSelectedUnit(null)
+    setSelectedUnitPrice(product.selling_price)
   }
 
   const addToCart = () => {
     const product = products.find((p) => p.id === selectedProductId)
     if (!product) return
     if (qty < 1) return
-    if (qty > product.stock_current) {
-      toast.error('Stock insuffisant', `Maximum disponible: ${product.stock_current}`)
+
+    // Calcul de la quantité en unité de base
+    const conversionRate = selectedUnit?.conversion_rate ?? 1
+    const quantityInBase = qty * conversionRate
+
+    if (quantityInBase > product.stock_current) {
+      toast.error('Stock insuffisant', `Maximum disponible: ${Math.floor(product.stock_current / conversionRate)} ${selectedUnit?.unit_name ?? product.base_unit ?? 'unité'}(s)`)
       return
     }
+
+    const unitPrice = selectedUnit ? selectedUnit.selling_price : product.selling_price
+
     setCart((prev) => {
-      const existing = prev.find((i) => i.product.id === product.id)
+      const key = `${product.id}-${selectedUnit?.id ?? 'base'}`
+      const existing = prev.find((i) => `${i.product.id}-${i.unit_id ?? 'base'}` === key)
       if (existing) {
         const newQty = existing.quantity + qty
-        const disc = existing.discount_amount
+        const newQtyInBase = newQty * conversionRate
         return prev.map((i) =>
-          i.product.id === product.id ? { ...i, quantity: newQty, total_price: newQty * i.unit_price - disc } : i
+          `${i.product.id}-${i.unit_id ?? 'base'}` === key
+            ? { ...i, quantity: newQty, quantity_in_base: newQtyInBase, total_price: newQty * unitPrice - i.discount_amount }
+            : i
         )
       }
-      return [...prev, { product, quantity: qty, unit_price: product.selling_price, discount_amount: 0, total_price: qty * product.selling_price }]
+      return [...prev, {
+        product,
+        quantity: qty,
+        unit_price: unitPrice,
+        unit_id: selectedUnit?.id ?? null,
+        unit_name: selectedUnit?.unit_name ?? (product.base_unit || 'Pièce'),
+        conversion_rate: conversionRate,
+        quantity_in_base: quantityInBase,
+        discount_amount: 0,
+        total_price: qty * unitPrice,
+      }]
     })
     setSelectedProductId('')
     setProductSearch('')
     setQty(1)
+    setSelectedUnit(null)
+    setSelectedUnitPrice(0)
   }
 
-  const updateQty = (productId: string, newQty: number) => {
-    if (newQty <= 0) { removeFromCart(productId); return }
-    setCart((prev) => prev.map((i) =>
-      i.product.id === productId ? { ...i, quantity: newQty, total_price: newQty * i.unit_price - i.discount_amount } : i
-    ))
+  const updateQty = (productId: string, unitId: string | null | undefined, newQty: number) => {
+    const key = `${productId}-${unitId ?? 'base'}`
+    if (newQty <= 0) {
+      setCart((prev) => prev.filter((i) => `${i.product.id}-${i.unit_id ?? 'base'}` !== key))
+      return
+    }
+    setCart((prev) => prev.map((i) => {
+      if (`${i.product.id}-${i.unit_id ?? 'base'}` !== key) return i
+      const newQtyInBase = newQty * (i.conversion_rate ?? 1)
+      return { ...i, quantity: newQty, quantity_in_base: newQtyInBase, total_price: newQty * i.unit_price - i.discount_amount }
+    }))
   }
 
-  const removeFromCart = (productId: string) => {
-    setCart((prev) => prev.filter((i) => i.product.id !== productId))
+  const removeFromCart = (productId: string, unitId: string | null | undefined) => {
+    const key = `${productId}-${unitId ?? 'base'}`
+    setCart((prev) => prev.filter((i) => `${i.product.id}-${i.unit_id ?? 'base'}` !== key))
   }
 
-  const applyProductDiscount = (productId: string) => {
+  const applyProductDiscount = (productId: string, unitId: string | null | undefined) => {
     const val = parseFloat(productDiscountValue)
     if (isNaN(val) || val < 0) return
+    const key = `${productId}-${unitId ?? 'base'}`
     setCart((prev) => prev.map((i) => {
-      if (i.product.id !== productId) return i
+      if (`${i.product.id}-${i.unit_id ?? 'base'}` !== key) return i
       const maxDiscount = i.quantity * i.unit_price
       const disc = Math.min(val, maxDiscount)
       return { ...i, discount_amount: disc, total_price: i.quantity * i.unit_price - disc }
@@ -238,7 +324,6 @@ export default function SalesPage() {
 
   if (isLoading) return <LoadingScreen text="Chargement des ventes..." />
 
-  // Blocage par rôle
   if (!canManageSales) {
     return (
       <div className="flex flex-col items-center justify-center py-16 space-y-4 text-center">
@@ -247,9 +332,7 @@ export default function SalesPage() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-slate-900">Accès non autorisé</h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            Vous n'avez pas les permissions pour accéder aux ventes.
-          </p>
+          <p className="text-sm text-muted-foreground mt-2">Vous n'avez pas les permissions pour accéder aux ventes.</p>
         </div>
       </div>
     )
@@ -260,9 +343,7 @@ export default function SalesPage() {
       {isReadOnly && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-center gap-2">
           <Lock className="h-4 w-4 text-red-500 shrink-0" />
-          <p className="text-sm text-red-600">
-            Votre abonnement a expiré. Vous pouvez consulter vos données mais pas créer de nouvelles ventes.
-          </p>
+          <p className="text-sm text-red-600">Votre abonnement a expiré. Vous pouvez consulter vos données mais pas créer de nouvelles ventes.</p>
         </div>
       )}
 
@@ -375,7 +456,11 @@ export default function SalesPage() {
             <div className="py-2 border rounded-md px-3 bg-muted/30">
               <p className="text-xs text-muted-foreground mb-1">Articles</p>
               {editingSale.sale_items?.map((item) => (
-                <p key={item.id} className="text-sm">{item.product?.name} × {item.quantity} — {formatCurrency(item.total_price)}</p>
+                <p key={item.id} className="text-sm">
+                  {item.product?.name}
+                  {item.unit_name && item.unit_name !== 'Pièce' && ` (${item.unit_name})`}
+                  {' '}× {item.quantity} — {formatCurrency(item.total_price)}
+                </p>
               ))}
               <p className="text-sm font-bold text-emerald-600 mt-1 pt-1 border-t">Total : {formatCurrency(editingSale.total_amount)}</p>
             </div>
@@ -401,7 +486,7 @@ export default function SalesPage() {
         </div>
       )}
 
-      {/* Modal nouveau client rapide */}
+      {/* Modal nouveau client */}
       {showNewClient && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 space-y-4">
@@ -428,6 +513,7 @@ export default function SalesPage() {
       {activeTab === 'new' && canCreateSale && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2 space-y-4">
+            {/* Recherche produit */}
             <Card className="p-4">
               <h3 className="font-medium text-sm mb-3">Ajouter un produit</h3>
               <div className="flex gap-2">
@@ -440,7 +526,7 @@ export default function SalesPage() {
                       onChange={(e) => { setProductSearch(e.target.value); setSelectedProductId(''); setShowProductDropdown(true) }}
                       onFocus={() => setShowProductDropdown(true)}
                       disabled={isReadOnly}
-                      placeholder="Rechercher un produit par nom..."
+                      placeholder="Rechercher un produit..."
                       className="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
                     />
                   </div>
@@ -452,7 +538,9 @@ export default function SalesPage() {
                         filteredProducts.map((p) => (
                           <button key={p.id} type="button" onClick={() => selectProduct(p)} className="w-full text-left px-3 py-2.5 text-sm hover:bg-orange-50 transition-colors border-b last:border-b-0">
                             <p className="font-medium text-slate-900">{p.name}</p>
-                            <p className="text-xs text-muted-foreground">{formatCurrency(p.selling_price)} · Stock: {p.stock_current} · Réf: {p.reference}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatCurrency(p.selling_price)} · Stock: {p.stock_current} {p.base_unit || 'pcs'} · Réf: {p.reference}
+                            </p>
                           </button>
                         ))
                       )}
@@ -460,16 +548,38 @@ export default function SalesPage() {
                   )}
                   {showProductDropdown && <div className="fixed inset-0 z-10" onClick={() => setShowProductDropdown(false)} />}
                 </div>
-                <input type="number" min="1" value={qty} onChange={(e) => setQty(parseInt(e.target.value) || 1)} disabled={isReadOnly} className="w-20 h-9 rounded-md border border-input bg-background px-3 text-sm text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50" />
+                <input
+                  type="number" min="1" value={qty}
+                  onChange={(e) => setQty(parseInt(e.target.value) || 1)}
+                  disabled={isReadOnly}
+                  className="w-20 h-9 rounded-md border border-input bg-background px-3 text-sm text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+                />
                 <Button onClick={addToCart} disabled={!selectedProductId || isReadOnly}>
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
+
+              {/* Sélecteur d'unité pour gros & détail */}
+              {selectedProduct && isGrosDetail && (
+                <UnitSelector
+                  product={selectedProduct}
+                  onSelect={(unit, price) => {
+                    setSelectedUnit(unit)
+                    setSelectedUnitPrice(price)
+                  }}
+                />
+              )}
+
               {selectedProduct && (
-                <p className="text-xs text-emerald-600 mt-2">✓ {selectedProduct.name} — {formatCurrency(selectedProduct.selling_price)} (stock: {selectedProduct.stock_current})</p>
+                <p className="text-xs text-emerald-600 mt-2">
+                  ✓ {selectedProduct.name} — {formatCurrency(selectedUnit ? selectedUnit.selling_price : selectedProduct.selling_price)}
+                  {selectedUnit ? ` (${selectedUnit.unit_name})` : ` (${selectedProduct.base_unit || 'Pièce'})`}
+                  · Stock: {selectedProduct.stock_current} {selectedProduct.base_unit || 'pcs'}
+                </p>
               )}
             </Card>
 
+            {/* Panier */}
             <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
               {cart.length === 0 ? (
                 <EmptyState icon={ShoppingCart} title="Panier vide" description="Ajoutez des produits pour créer une vente" />
@@ -479,6 +589,7 @@ export default function SalesPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Produit</TableHead>
+                        {isGrosDetail && <TableHead>Unité</TableHead>}
                         <TableHead className="text-right">Prix unit.</TableHead>
                         <TableHead className="text-center">Qté</TableHead>
                         {canApplyDiscount && <TableHead className="text-right">Remise</TableHead>}
@@ -487,53 +598,69 @@ export default function SalesPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {cart.map((item) => (
-                        <TableRow key={item.product.id}>
-                          <TableCell>
-                            <p className="font-medium text-sm">{item.product.name}</p>
-                            <p className="text-xs font-mono text-muted-foreground">{item.product.reference}</p>
-                          </TableCell>
-                          <TableCell className="text-right text-sm">{formatCurrency(item.unit_price)}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-center gap-1">
-                              <button onClick={() => updateQty(item.product.id, item.quantity - 1)} disabled={isReadOnly} className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30">
-                                <Minus className="h-3 w-3" />
-                              </button>
-                              <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                              <button onClick={() => updateQty(item.product.id, item.quantity + 1)} disabled={isReadOnly} className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30">
-                                <Plus className="h-3 w-3" />
-                              </button>
-                            </div>
-                          </TableCell>
-                          {canApplyDiscount && (
-                            <TableCell className="text-right">
-                              {editingDiscountId === item.product.id ? (
-                                <div className="flex items-center gap-1 justify-end">
-                                  <input type="number" value={productDiscountValue} onChange={(e) => setProductDiscountValue(e.target.value)} className="w-20 h-7 rounded border border-input px-2 text-xs text-right" placeholder="0 XOF" autoFocus />
-                                  <button onClick={() => applyProductDiscount(item.product.id)} className="text-xs text-emerald-600 font-medium hover:underline">OK</button>
-                                  <button onClick={() => setEditingDiscountId(null)} className="text-xs text-muted-foreground hover:underline">✕</button>
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={() => { setEditingDiscountId(item.product.id); setProductDiscountValue(item.discount_amount > 0 ? item.discount_amount.toString() : '') }}
-                                  className={`text-xs ${item.discount_amount > 0 ? 'text-orange-500 font-medium' : 'text-muted-foreground hover:text-orange-500'}`}
-                                >
-                                  {item.discount_amount > 0 ? `-${formatCurrency(item.discount_amount)}` : '+ Remise'}
-                                </button>
-                              )}
+                      {cart.map((item) => {
+                        const key = `${item.product.id}-${item.unit_id ?? 'base'}`
+                        return (
+                          <TableRow key={key}>
+                            <TableCell>
+                              <p className="font-medium text-sm">{item.product.name}</p>
+                              <p className="text-xs font-mono text-muted-foreground">{item.product.reference}</p>
                             </TableCell>
-                          )}
-                          <TableCell className="text-right font-semibold">{formatCurrency(item.total_price)}</TableCell>
-                          <TableCell>
-                            <button onClick={() => removeFromCart(item.product.id)} disabled={isReadOnly} className="p-1 hover:bg-red-50 rounded disabled:opacity-30">
-                              <Trash2 className="h-3.5 w-3.5 text-red-400" />
-                            </button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                            {isGrosDetail && (
+                              <TableCell>
+                                <span className="text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded">
+                                  {item.unit_name}
+                                </span>
+                                {item.conversion_rate && item.conversion_rate > 1 && (
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    = {item.quantity * item.conversion_rate} {item.product.base_unit || 'pcs'}
+                                  </p>
+                                )}
+                              </TableCell>
+                            )}
+                            <TableCell className="text-right text-sm">{formatCurrency(item.unit_price)}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center justify-center gap-1">
+                                <button onClick={() => updateQty(item.product.id, item.unit_id, item.quantity - 1)} disabled={isReadOnly} className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30">
+                                  <Minus className="h-3 w-3" />
+                                </button>
+                                <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                                <button onClick={() => updateQty(item.product.id, item.unit_id, item.quantity + 1)} disabled={isReadOnly} className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30">
+                                  <Plus className="h-3 w-3" />
+                                </button>
+                              </div>
+                            </TableCell>
+                            {canApplyDiscount && (
+                              <TableCell className="text-right">
+                                {editingDiscountId === key ? (
+                                  <div className="flex items-center gap-1 justify-end">
+                                    <input type="number" value={productDiscountValue} onChange={(e) => setProductDiscountValue(e.target.value)} className="w-20 h-7 rounded border border-input px-2 text-xs text-right" placeholder="0 XOF" autoFocus />
+                                    <button onClick={() => applyProductDiscount(item.product.id, item.unit_id)} className="text-xs text-emerald-600 font-medium hover:underline">OK</button>
+                                    <button onClick={() => setEditingDiscountId(null)} className="text-xs text-muted-foreground hover:underline">✕</button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => { setEditingDiscountId(key); setProductDiscountValue(item.discount_amount > 0 ? item.discount_amount.toString() : '') }}
+                                    className={`text-xs ${item.discount_amount > 0 ? 'text-orange-500 font-medium' : 'text-muted-foreground hover:text-orange-500'}`}
+                                  >
+                                    {item.discount_amount > 0 ? `-${formatCurrency(item.discount_amount)}` : '+ Remise'}
+                                  </button>
+                                )}
+                              </TableCell>
+                            )}
+                            <TableCell className="text-right font-semibold">{formatCurrency(item.total_price)}</TableCell>
+                            <TableCell>
+                              <button onClick={() => removeFromCart(item.product.id, item.unit_id)} disabled={isReadOnly} className="p-1 hover:bg-red-50 rounded disabled:opacity-30">
+                                <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                              </button>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
                     </TableBody>
                   </Table>
 
+                  {/* Sous-total + remise */}
                   <div className="px-4 py-3 border-t bg-slate-50 space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Sous-total</span>
@@ -568,6 +695,7 @@ export default function SalesPage() {
             </div>
           </div>
 
+          {/* Récapitulatif */}
           <div className="space-y-4">
             <Card className="p-4 space-y-4">
               <h3 className="font-semibold">Récapitulatif</h3>
@@ -575,6 +703,7 @@ export default function SalesPage() {
                 <span className="text-sm font-medium">Total à payer</span>
                 <span className="text-xl font-bold text-emerald-600">{formatCurrency(cartTotal)}</span>
               </div>
+
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium">Client <span className="text-muted-foreground font-normal">(optionnel)</span></label>
                 <div className="flex gap-2">
@@ -587,6 +716,7 @@ export default function SalesPage() {
                   </button>
                 </div>
               </div>
+
               <Select
                 label="Statut du paiement"
                 value={statut}
@@ -597,6 +727,7 @@ export default function SalesPage() {
                   { value: 'partiel', label: '🟡 Paiement partiel' },
                 ]}
               />
+
               {statut === 'partiel' && (
                 <div className="space-y-1.5">
                   <label className="block text-sm font-medium">Montant payé (XOF)</label>
@@ -604,11 +735,13 @@ export default function SalesPage() {
                   {parseFloat(montantPaye) > 0 && <p className="text-xs text-red-500">Reste dû : {formatCurrency(cartTotal - parseFloat(montantPaye))}</p>}
                 </div>
               )}
+
               {(statut === 'credit' || statut === 'partiel') && selectedClientId && montantDu > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2">
                   <p className="text-xs text-red-600 font-medium">{formatCurrency(montantDu)} sera ajouté au crédit de {clients.find((c) => c.id === selectedClientId)?.name}</p>
                 </div>
               )}
+
               {statut !== 'credit' && (
                 <Select
                   label="Mode de paiement"
@@ -621,10 +754,12 @@ export default function SalesPage() {
                   ]}
                 />
               )}
+
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium">Notes (optionnel)</label>
                 <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
               </div>
+
               <Button className="w-full" onClick={handleSubmitSale} disabled={cart.length === 0 || isReadOnly} isLoading={submitting}>
                 <Receipt className="h-4 w-4" /> Valider la vente
               </Button>
