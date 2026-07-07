@@ -1,5 +1,5 @@
 // ============================================================
-// QUINCAILLERIE PRO — Types TypeScript
+// STOCKAM — Types TypeScript
 // ============================================================
 export type UserRole = 'admin' | 'caissier' | 'magasinier' | 'promoteur'
 
