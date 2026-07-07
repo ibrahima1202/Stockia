@@ -65,7 +65,8 @@ export const productService = {
       .select('id')
       .eq('business_id', businessId)
     const count = (existing?.length ?? 0) + 1
-    const reference = `PRD-${String(count).padStart(4, '0')}`
+    const timestamp = Date.now().toString().slice(-4)
+    const reference = `PRD-${String(count).padStart(4, '0')}-${timestamp}`
 
     const { data, error } = await supabase
       .from('products')
