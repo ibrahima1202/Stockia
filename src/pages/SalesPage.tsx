@@ -19,29 +19,28 @@ import type { Sale, SaleCartItem, PaymentMethod, SaleStatut, Product, DiscountTy
 import { useToast } from '@/store/toastStore'
 import { pdfService } from '@/services/pdfService'
 
-// Composant sélecteur d'unité pour gros & détail
 function UnitSelector({
   product,
   onSelect,
 }: {
   product: Product
-  onSelect: (unit: ProductUnit | null, price: number) => void
+  onSelect: (unit: ProductUnit | null) => void
 }) {
   const { units } = useProductUnits(product.id)
   const [selectedUnitId, setSelectedUnitId] = useState<string>('')
 
   useEffect(() => {
     setSelectedUnitId('')
-    onSelect(null, product.selling_price)
+    onSelect(null)
   }, [product.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChange = (unitId: string) => {
     setSelectedUnitId(unitId)
     if (!unitId) {
-      onSelect(null, product.selling_price)
+      onSelect(null)
     } else {
       const unit = units.find((u) => u.id === unitId)
-      if (unit) onSelect(unit, unit.selling_price)
+      if (unit) onSelect(unit)
     }
   }
 
@@ -142,7 +141,6 @@ export default function SalesPage() {
     setProductSearch(product.name)
     setShowProductDropdown(false)
     setSelectedUnit(null)
-    setSelectedUnitPrice(product.selling_price)
   }
 
   const addToCart = () => {
@@ -150,7 +148,6 @@ export default function SalesPage() {
     if (!product) return
     if (qty < 1) return
 
-    // Calcul de la quantité en unité de base
     const conversionRate = selectedUnit?.conversion_rate ?? 1
     const quantityInBase = qty * conversionRate
 
@@ -189,7 +186,6 @@ export default function SalesPage() {
     setProductSearch('')
     setQty(1)
     setSelectedUnit(null)
-    setSelectedUnitPrice(0)
   }
 
   const updateQty = (productId: string, unitId: string | null | undefined, newQty: number) => {
@@ -512,7 +508,6 @@ export default function SalesPage() {
       {activeTab === 'new' && canCreateSale && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2 space-y-4">
-            {/* Recherche produit */}
             <Card className="p-4">
               <h3 className="font-medium text-sm mb-3">Ajouter un produit</h3>
               <div className="flex gap-2">
@@ -548,24 +543,30 @@ export default function SalesPage() {
                   {showProductDropdown && <div className="fixed inset-0 z-10" onClick={() => setShowProductDropdown(false)} />}
                 </div>
                 <input
-                  type="number" min="1" value={qty}
-                  onChange={(e) => setQty(parseInt(e.target.value) || 1)}
+                  type="number"
+                  min="1"
+                  value={qty === 0 ? '' : qty}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (val === '') {
+                      setQty(0)
+                    } else {
+                      setQty(parseInt(val) || 1)
+                    }
+                  }}
+                  onFocus={(e) => e.target.select()}
                   disabled={isReadOnly}
                   className="w-20 h-9 rounded-md border border-input bg-background px-3 text-sm text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
                 />
-                <Button onClick={addToCart} disabled={!selectedProductId || isReadOnly}>
+                <Button onClick={addToCart} disabled={!selectedProductId || isReadOnly || qty < 1}>
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
 
-              {/* Sélecteur d'unité pour gros & détail */}
               {selectedProduct && isGrosDetail && (
                 <UnitSelector
                   product={selectedProduct}
-                  onSelect={(unit, price) => {
-                    setSelectedUnit(unit)
-                    setSelectedUnitPrice(price)
-                  }}
+                  onSelect={(unit) => setSelectedUnit(unit)}
                 />
               )}
 
@@ -659,7 +660,6 @@ export default function SalesPage() {
                     </TableBody>
                   </Table>
 
-                  {/* Sous-total + remise */}
                   <div className="px-4 py-3 border-t bg-slate-50 space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Sous-total</span>
