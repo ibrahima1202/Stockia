@@ -31,21 +31,25 @@ export function useSubscription() {
   useEffect(() => { load() }, [load])
 
   const createBusiness = async (
-    payload: { name: string; phone?: string; address?: string; city?: string },
+    payload: {
+      name: string
+      phone?: string
+      address?: string
+      city?: string
+      commerce_type?: 'detail' | 'gros_detail'
+    },
     planId: string
   ) => {
     const biz = await subscriptionService.createBusiness(payload)
     const sub = await subscriptionService.createSubscription(planId)
     setBusiness(biz)
     setSubscription(sub)
-
     if (user) {
       try {
         const updatedProfile = await authService.getProfile(user.id)
         setProfile(updatedProfile)
       } catch {}
     }
-
     return { biz, sub }
   }
 
