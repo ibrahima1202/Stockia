@@ -93,7 +93,7 @@ export const pdfService = {
     doc.text(statutLabel, 55, y)
     y += 10
 
-    // Tableau articles
+    // Tableau articles avec bordures
     autoTable(doc, {
       startY: y,
       head: [['Désignation', 'Qté', 'Remise', 'Prix unit.', 'Total']],
@@ -108,9 +108,18 @@ export const pdfService = {
         fillColor: DARK_COLOR,
         textColor: [255, 255, 255],
         fontStyle: 'bold',
+        lineWidth: 0.3,
+        lineColor: [255, 255, 255],
+      },
+      bodyStyles: {
+        lineWidth: 0.3,
+        lineColor: [226, 232, 240],
       },
       alternateRowStyles: { fillColor: [248, 250, 252] },
-      styles: { fontSize: 9 },
+      styles: {
+        fontSize: 9,
+        cellPadding: 4,
+      },
       columnStyles: {
         0: { cellWidth: 70 },
         1: { halign: 'center' },
@@ -118,6 +127,8 @@ export const pdfService = {
         3: { halign: 'right' },
         4: { halign: 'right', fontStyle: 'bold' },
       },
+      tableLineWidth: 0.3,
+      tableLineColor: [226, 232, 240],
     })
 
     let finalY = (doc as any).lastAutoTable.finalY + 6
@@ -166,7 +177,7 @@ export const pdfService = {
       )
     }
 
-    // Note de bas de page
+    // Merci
     finalY += 12
     doc.setFontSize(8)
     doc.setTextColor(148, 163, 184)
@@ -198,14 +209,26 @@ export const pdfService = {
         e.credit > 0 ? formatXOF(e.credit) : '—',
         formatXOF(e.balance),
       ]),
-      headStyles: { fillColor: DARK_COLOR, textColor: [255, 255, 255], fontStyle: 'bold' },
+      headStyles: {
+        fillColor: DARK_COLOR,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        lineWidth: 0.3,
+        lineColor: [255, 255, 255],
+      },
+      bodyStyles: {
+        lineWidth: 0.3,
+        lineColor: [226, 232, 240],
+      },
       alternateRowStyles: { fillColor: [248, 250, 252] },
-      styles: { fontSize: 8 },
+      styles: { fontSize: 8, cellPadding: 4 },
       columnStyles: {
         3: { halign: 'right' },
         4: { halign: 'right' },
         5: { halign: 'right', fontStyle: 'bold' },
       },
+      tableLineWidth: 0.3,
+      tableLineColor: [226, 232, 240],
     })
 
     const totalDebit = entries.reduce((s, e) => s + e.debit, 0)
@@ -246,15 +269,27 @@ export const pdfService = {
         formatXOF(p.purchase_price),
         formatXOF(p.stock_current * p.purchase_price),
       ]),
-      headStyles: { fillColor: DARK_COLOR, textColor: [255, 255, 255], fontStyle: 'bold' },
+      headStyles: {
+        fillColor: DARK_COLOR,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        lineWidth: 0.3,
+        lineColor: [255, 255, 255],
+      },
+      bodyStyles: {
+        lineWidth: 0.3,
+        lineColor: [226, 232, 240],
+      },
       alternateRowStyles: { fillColor: [248, 250, 252] },
-      styles: { fontSize: 8 },
+      styles: { fontSize: 8, cellPadding: 4 },
       columnStyles: {
         3: { halign: 'center' },
         4: { halign: 'center' },
         5: { halign: 'right' },
         6: { halign: 'right', fontStyle: 'bold' },
       },
+      tableLineWidth: 0.3,
+      tableLineColor: [226, 232, 240],
       didParseCell: (data) => {
         if (data.section === 'body' && data.column.index === 3) {
           const product = products[data.row.index]
