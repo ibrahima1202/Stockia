@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Building2, User, Phone, MapPin, Check, Eye, EyeOff } from 'lucide-react'
+import { Building2, User, Phone, MapPin, Check, Eye, EyeOff, Package, ShoppingBag } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useSubscription } from '@/hooks/useSubscription'
 
@@ -26,6 +26,7 @@ export default function RegisterPage() {
   const [businessName, setBusinessName] = useState('')
   const [businessPhone, setBusinessPhone] = useState('')
   const [businessCity, setBusinessCity] = useState('')
+  const [commerceType, setCommerceType] = useState<'detail' | 'gros_detail'>('detail')
 
   const handleStep1 = () => {
     if (!fullName || !email || !password) {
@@ -66,7 +67,12 @@ export default function RegisterPage() {
       if (!businessPlan) throw new Error('Plan introuvable')
 
       await createBusiness(
-        { name: businessName, phone: businessPhone, city: businessCity },
+        {
+          name: businessName,
+          phone: businessPhone,
+          city: businessCity,
+          commerce_type: commerceType,
+        },
         businessPlan.id
       )
 
@@ -249,6 +255,48 @@ export default function RegisterPage() {
                 <h2 className="text-lg font-bold text-slate-900">Votre commerce</h2>
                 <p className="text-sm text-slate-500 mt-0.5">Informations sur votre boutique</p>
               </div>
+
+              {/* Type de commerce */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-slate-700">Type de vente *</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCommerceType('detail')}
+                    className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-colors ${
+                      commerceType === 'detail'
+                        ? 'border-orange-500 bg-orange-50'
+                        : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <Package className={`h-5 w-5 ${commerceType === 'detail' ? 'text-orange-500' : 'text-slate-400'}`} />
+                    <div className="text-center">
+                      <p className={`text-xs font-semibold ${commerceType === 'detail' ? 'text-orange-600' : 'text-slate-700'}`}>
+                        Vente au détail
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Vente à l'unité</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCommerceType('gros_detail')}
+                    className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-colors ${
+                      commerceType === 'gros_detail'
+                        ? 'border-orange-500 bg-orange-50'
+                        : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <ShoppingBag className={`h-5 w-5 ${commerceType === 'gros_detail' ? 'text-orange-500' : 'text-slate-400'}`} />
+                    <div className="text-center">
+                      <p className={`text-xs font-semibold ${commerceType === 'gros_detail' ? 'text-orange-600' : 'text-slate-700'}`}>
+                        Gros & Détail
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Carton, pack, pièce...</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium mb-1">Nom du commerce *</label>
