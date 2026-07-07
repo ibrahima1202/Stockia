@@ -23,13 +23,8 @@ export const subscriptionService = {
       .from('subscriptions')
       .select('*, plan:plans(*)')
       .eq('owner_id', (await supabase.auth.getUser()).data.user?.id ?? '')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    if (error) {
-      console.error('getMySubscription error:', error)
-      return null
-    }
+      .single()
+    if (error) return null
     return data
   },
 
@@ -116,7 +111,11 @@ export const subscriptionService = {
     // 1. Créer le commerce
     const { data, error } = await supabase
       .from('businesses')
-      .insert({ ...payload, owner_id: user.id })
+      .insert({
+        ...payload,
+        owner_id: user.id,
+        commerce_type: payload.commerce_type ?? 'detail',
+      })
       .select()
       .single()
     if (error) throw error
