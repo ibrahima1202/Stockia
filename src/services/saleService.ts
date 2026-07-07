@@ -45,13 +45,8 @@ export const saleService = {
     const reference = generateReference('VTE')
     const businessId = getBusinessId()
 
-    // Calcul du sous-total (après remises produits)
     const subtotal = payload.items.reduce((sum, item) => sum + item.total_price, 0)
-
-    // Calcul remise facture
     const discountAmount = payload.discount?.amount ?? 0
-
-    // Total final après remise facture
     const totalAmount = Math.max(0, subtotal - discountAmount)
 
     const statut = payload.statut ?? 'paye'
@@ -81,12 +76,16 @@ export const saleService = {
       .single()
     if (saleError) throw saleError
 
-    // 2. Articles avec remises produits
+    // 2. Articles
     const saleItems = payload.items.map((item) => ({
       sale_id: sale.id,
       product_id: item.product.id,
       quantity: item.quantity,
       unit_price: item.unit_price,
+      unit_id: item.unit_id ?? null,
+      unit_name: item.unit_name ?? null,
+      conversion_rate: item.conversion_rate ?? 1,
+      quantity_in_base: item.quantity_in_base ?? item.quantity,
       discount_amount: item.discount_amount ?? 0,
       total_price: item.total_price,
       business_id: businessId,
@@ -94,8 +93,10 @@ export const saleService = {
     const { error: itemsError } = await supabase.from('sale_items').insert(saleItems)
     if (itemsError) throw itemsError
 
-    // 3. Mise à jour stock + mouvements
+    // 3. Mise à jour stock — utilise quantity_in_base pour les conversions
     for (const item of payload.items) {
+      const quantityToDeduct = item.quantity_in_base ?? item.quantity
+
       const { data: product, error: pError } = await supabase
         .from('products')
         .select('stock_current')
@@ -103,7 +104,7 @@ export const saleService = {
         .single()
       if (pError) throw pError
 
-      const newStock = product.stock_current - item.quantity
+      const newStock = product.stock_current - quantityToDeduct
       if (newStock < 0) throw new Error(`Stock insuffisant pour ${item.product.name}`)
 
       const { error: stockError } = await supabase
@@ -112,11 +113,16 @@ export const saleService = {
         .eq('id', item.product.id)
       if (stockError) throw stockError
 
+      // Mouvement de stock avec la quantité en unité de base
+      const unitLabel = item.unit_name && item.unit_name !== item.product.base_unit
+        ? `${item.quantity} ${item.unit_name} (${quantityToDeduct} ${item.product.base_unit || 'pcs'})`
+        : `${quantityToDeduct}`
+
       const { error: movError } = await supabase.from('stock_movements').insert({
         product_id: item.product.id,
         type: 'sortie',
-        quantity: item.quantity,
-        reason: `Vente ${reference}`,
+        quantity: quantityToDeduct,
+        reason: `Vente ${reference} — ${unitLabel}`,
         reference,
         created_by: userId,
         business_id: businessId,
@@ -124,7 +130,7 @@ export const saleService = {
       if (movError) throw movError
     }
 
-    // 4. Journal — montant encaissé
+    // 4. Journal
     if (montantPaye > 0) {
       const discountLabel = discountAmount > 0 ? ` (remise ${discountAmount} XOF)` : ''
       const { error: journalError } = await supabase.from('journal_entries').insert({
@@ -140,7 +146,7 @@ export const saleService = {
       if (journalError) throw journalError
     }
 
-    // 5. Si crédit ou partiel → mettre à jour le solde du client
+    // 5. Crédit client
     if (payload.client_id && montantDu > 0) {
       const { data: client, error: cError } = await supabase
         .from('clients')
@@ -174,12 +180,15 @@ export const saleService = {
   async delete(id: string): Promise<void> {
     const { data: sale, error: fetchError } = await supabase
       .from('sales')
-      .select('reference, statut, montant_paye, total_amount, client_id, sale_items(product_id, quantity)')
+      .select('reference, statut, montant_paye, total_amount, client_id, sale_items(product_id, quantity, quantity_in_base, conversion_rate)')
       .eq('id', id)
       .single()
     if (fetchError) throw fetchError
 
+    // Restituer le stock en unité de base
     for (const item of (sale.sale_items || [])) {
+      const quantityToRestore = item.quantity_in_base ?? item.quantity
+
       const { data: product, error: pError } = await supabase
         .from('products')
         .select('stock_current')
@@ -189,7 +198,7 @@ export const saleService = {
 
       const { error: stockError } = await supabase
         .from('products')
-        .update({ stock_current: product.stock_current + item.quantity })
+        .update({ stock_current: product.stock_current + quantityToRestore })
         .eq('id', item.product_id)
       if (stockError) throw stockError
     }
