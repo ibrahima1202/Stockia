@@ -62,7 +62,6 @@ export const pdfService = {
     const doc = new jsPDF()
     addHeader(doc, businessName, 'REÇU DE VENTE')
 
-    // Infos vente — commencent après le header (y=28)
     let y = 38
     doc.setFontSize(10)
     doc.setTextColor(...DARK_COLOR)
@@ -97,7 +96,7 @@ export const pdfService = {
     // Tableau articles
     autoTable(doc, {
       startY: y,
-      head: [['Produit', 'Qté', 'Remise', 'Prix unit.', 'Total']],
+      head: [['Désignation', 'Qté', 'Remise', 'Prix unit.', 'Total']],
       body: (sale.sale_items || []).map((item) => [
         item.product?.name ?? '—',
         item.quantity.toString(),
@@ -105,10 +104,15 @@ export const pdfService = {
         `${formatXOF(item.unit_price)} XOF`,
         `${formatXOF(item.total_price)} XOF`,
       ]),
-      headStyles: { fillColor: DARK_COLOR, textColor: [255, 255, 255], fontStyle: 'bold' },
+      headStyles: {
+        fillColor: DARK_COLOR,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+      },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       styles: { fontSize: 9 },
       columnStyles: {
+        0: { cellWidth: 70 },
         1: { halign: 'center' },
         2: { halign: 'right', textColor: [249, 115, 22] },
         3: { halign: 'right' },
@@ -120,11 +124,11 @@ export const pdfService = {
 
     // Remise facture
     if ((sale.discount_amount ?? 0) > 0) {
+      const subtotal = (sale.total_amount ?? 0) + (sale.discount_amount ?? 0)
       doc.setFontSize(9)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(100, 116, 139)
       doc.text('Sous-total :', 125, finalY)
-      const subtotal = (sale.total_amount ?? 0) + (sale.discount_amount ?? 0)
       doc.text(`${formatXOF(subtotal)} XOF`, 196, finalY, { align: 'right' })
       finalY += 6
 
@@ -150,11 +154,24 @@ export const pdfService = {
       doc.setTextColor(239, 68, 68)
       doc.setFont('helvetica', 'normal')
       doc.text(
+        `Montant payé : ${formatXOF(sale.montant_paye ?? 0)} XOF`,
+        196, finalY,
+        { align: 'right' }
+      )
+      finalY += 6
+      doc.text(
         `Reste dû : ${formatXOF(sale.total_amount - (sale.montant_paye ?? 0))} XOF`,
         196, finalY,
         { align: 'right' }
       )
     }
+
+    // Note de bas de page
+    finalY += 12
+    doc.setFontSize(8)
+    doc.setTextColor(148, 163, 184)
+    doc.setFont('helvetica', 'italic')
+    doc.text('Merci pour votre achat !', 105, finalY, { align: 'center' })
 
     addFooter(doc)
     doc.save(`recu-${sale.reference}.pdf`)
@@ -261,4 +278,4 @@ export const pdfService = {
     addFooter(doc)
     doc.save(`stock-${format(new Date(), 'yyyy-MM-dd')}.pdf`)
   },
-        }
+}
