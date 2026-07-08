@@ -31,7 +31,6 @@ const productSchema = z.object({
 })
 type ProductForm = z.infer<typeof productSchema>
 
-// Composant pour gérer les unités d'un produit
 function ProductUnitsManager({ product, onClose }: { product: Product; onClose: () => void }) {
   const { units, isLoading, createUnit, deleteUnit } = useProductUnits(product.id)
   const toast = useToast()
@@ -72,7 +71,6 @@ function ProductUnitsManager({ product, onClose }: { product: Product; onClose: 
           </button>
         </div>
 
-        {/* Unité de base */}
         <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
           <p className="text-xs font-semibold text-orange-700 mb-1">Unité de base (stock)</p>
           <p className="text-sm font-bold">{product.base_unit || 'Pièce'}</p>
@@ -81,7 +79,6 @@ function ProductUnitsManager({ product, onClose }: { product: Product; onClose: 
           </p>
         </div>
 
-        {/* Liste des unités */}
         {isLoading ? (
           <p className="text-sm text-muted-foreground text-center py-4">Chargement...</p>
         ) : units.length === 0 ? (
@@ -103,10 +100,7 @@ function ProductUnitsManager({ product, onClose }: { product: Product; onClose: 
                 </div>
                 <div className="flex items-center gap-3">
                   <p className="text-sm font-bold text-emerald-600">{formatCurrency(unit.selling_price)}</p>
-                  <button
-                    onClick={() => deleteUnit(unit.id)}
-                    className="p-1 hover:bg-red-50 rounded text-red-400"
-                  >
+                  <button onClick={() => deleteUnit(unit.id)} className="p-1 hover:bg-red-50 rounded text-red-400">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -115,7 +109,6 @@ function ProductUnitsManager({ product, onClose }: { product: Product; onClose: 
           </div>
         )}
 
-        {/* Ajouter une unité */}
         <div className="border-t pt-4 space-y-3">
           <p className="text-sm font-medium text-slate-700">Ajouter une unité :</p>
           <div className="grid grid-cols-2 gap-2">
@@ -165,16 +158,22 @@ function ProductUnitsManager({ product, onClose }: { product: Product; onClose: 
     </div>
   )
 }
+
 function StockDisplay({ product }: { product: Product }) {
   const { units } = useProductUnits(product.id)
-  if (units.length === 0 || product.stock_current === 0) {
-    return (  )
 
-       <StockDisplay product={p} />
+  if (units.length === 0 || product.stock_current === 0) {
+    return (
+      <Badge variant={product.stock_current === 0 ? 'danger' : product.stock_current <= product.stock_minimum ? 'warning' : 'success'}>
+        {product.stock_current} {product.base_unit || 'Pcs'}
+      </Badge>
+    )
   }
+
   const sortedUnits = [...units].sort((a, b) => b.conversion_rate - a.conversion_rate)
   let remaining = product.stock_current
   const parts: string[] = []
+
   for (const unit of sortedUnits) {
     if (remaining >= unit.conversion_rate) {
       const qty = Math.floor(remaining / unit.conversion_rate)
@@ -182,8 +181,11 @@ function StockDisplay({ product }: { product: Product }) {
       remaining = remaining % unit.conversion_rate
     }
   }
+
   if (remaining > 0) parts.push(`${remaining} ${product.base_unit || 'Pcs'}`)
+
   const isLow = product.stock_current <= product.stock_minimum
+
   return (
     <div className="space-y-0.5">
       <Badge variant={product.stock_current === 0 ? 'danger' : isLow ? 'warning' : 'success'}>
@@ -193,6 +195,7 @@ function StockDisplay({ product }: { product: Product }) {
     </div>
   )
 }
+
 export default function ProductsPage() {
   const { products, categories, isLoading, createProduct, updateProduct, deleteProduct, createCategory } = useProducts()
   const { canManageProducts, canExportPDFRole } = useRole()
@@ -207,7 +210,6 @@ export default function ProductsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<Product | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [unitsProduct, setUnitsProduct] = useState<Product | null>(null)
-
   const [showNewCategory, setShowNewCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
   const [categorySubmitting, setCategorySubmitting] = useState(false)
@@ -406,9 +408,13 @@ export default function ProductsPage() {
                     <TableCell className="text-right text-sm">{formatCurrency(p.purchase_price)}</TableCell>
                     <TableCell className="text-right text-sm font-semibold">{formatCurrency(p.selling_price)}</TableCell>
                     <TableCell className="text-right">
-                      <Badge variant={p.stock_current === 0 ? 'danger' : isLow ? 'warning' : 'success'}>
-                        {p.stock_current} {p.base_unit || ''}
-                      </Badge>
+                      {isGrosDetail ? (
+                        <StockDisplay product={p} />
+                      ) : (
+                        <Badge variant={p.stock_current === 0 ? 'danger' : isLow ? 'warning' : 'success'}>
+                          {p.stock_current} {p.base_unit || ''}
+                        </Badge>
+                      )}
                     </TableCell>
                     {isGrosDetail && (
                       <TableCell className="text-center">
@@ -467,8 +473,6 @@ export default function ProductsPage() {
               <div className="col-span-2">
                 <Input label="Nom du produit" error={errors.name?.message} required {...register('name')} />
               </div>
-
-              {/* Catégorie + ajout rapide */}
               <div className="col-span-2 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="block text-sm font-medium text-foreground">Catégorie</label>
@@ -480,7 +484,6 @@ export default function ProductsPage() {
                     <Plus className="h-3 w-3" /> Nouvelle catégorie
                   </button>
                 </div>
-
                 {showNewCategory && (
                   <div className="flex gap-2 mb-2">
                     <input
@@ -509,7 +512,6 @@ export default function ProductsPage() {
                     </button>
                   </div>
                 )}
-
                 <select
                   value={selectedCategoryId}
                   onChange={(e) => {
@@ -524,8 +526,6 @@ export default function ProductsPage() {
                   ))}
                 </select>
               </div>
-
-              {/* Unité de base — uniquement pour gros & détail */}
               {isGrosDetail && (
                 <div className="col-span-2">
                   <label className="block text-sm font-medium mb-1">
@@ -542,7 +542,6 @@ export default function ProductsPage() {
                   </p>
                 </div>
               )}
-
               <Input label="Prix d'achat (XOF)" type="number" step="1" error={errors.purchase_price?.message} required {...register('purchase_price')} />
               <Input
                 label={isGrosDetail ? `Prix vente unité de base (XOF)` : 'Prix de vente (XOF)'}
