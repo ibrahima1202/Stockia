@@ -9,15 +9,17 @@ export interface ProductStat {
   cost: number
   profit: number
 }
+
 export interface PeriodStats {
   revenue: number
   cost: number
   profit: number
-  salesCount: number
   expenses: number
   resultatNet: number
+  salesCount: number
   productStats: ProductStat[]
 }
+
 export interface FondsRoulement {
   stockValue: number
   cashBalance: number
@@ -25,117 +27,144 @@ export interface FondsRoulement {
   fournisseursDebts: number
   total: number
 }
-interface ProductJoin {
-  id: string
-  name: string
-  reference: string
-  purchase_price: number
-}
 
 export const statsService = {
-  async getPeriodStats(startDate: string, endDate: string): Promise<PeriodStats> {
-    const { data: sales, error } = await supabase
+  async getPeriodStats(start: string, end: string): Promise<PeriodStats> {
+    // 1. Récupérer les ventes avec leurs articles
+    const { data: sales, error: salesError } = await supabase
       .from('sales')
-      .select('id, sale_items(quantity, unit_price, total_price, product:products(id, name, reference, purchase_price))')
-      .gte('created_at', `${startDate}T00:00:00`)
-      .lte('created_at', `${endDate}T23:59:59`)
-    if (error) throw error
+      .select(`
+        id, total_amount, montant_paye, statut,
+        sale_items(
+          quantity, unit_price, total_price, discount_amount,
+          quantity_in_base, conversion_rate,
+          product:products(id, name, reference, purchase_price)
+        )
+      `)
+      .gte('created_at', `${start}T00:00:00`)
+      .lte('created_at', `${end}T23:59:59`)
+    if (salesError) throw salesError
 
+    // 2. Calculer le CA et le coût
+    let revenue = 0
+    let cost = 0
     const productMap = new Map<string, ProductStat>()
-    let totalRevenue = 0
-    let totalCost = 0
 
     for (const sale of sales || []) {
+      // CA = montant effectivement encaissé
+      if (sale.statut === 'paye') {
+        revenue += sale.total_amount
+      } else if (sale.statut === 'partiel') {
+        revenue += sale.montant_paye ?? 0
+      }
+      // Pour le crédit, on ne compte pas dans le CA encaissé
+
       for (const item of sale.sale_items || []) {
-        const rawProduct = item.product as unknown
-        const product: ProductJoin | null = Array.isArray(rawProduct)
-          ? (rawProduct[0] as ProductJoin) ?? null
-          : (rawProduct as ProductJoin) ?? null
+        const product = item.product
         if (!product) continue
 
-        const itemRevenue = item.total_price
-        const itemCost = product.purchase_price * item.quantity
-        totalRevenue += itemRevenue
-        totalCost += itemCost
+        // Quantité réelle vendue en unité de base
+        const qtyInBase = item.quantity_in_base ?? item.quantity
 
+        // Coût = prix d'achat × quantité en unité de base
+        const itemCost = product.purchase_price * qtyInBase
+        cost += itemCost
+
+        // Agrégation par produit
         const existing = productMap.get(product.id)
         if (existing) {
-          existing.quantity_sold += item.quantity
-          existing.revenue += itemRevenue
+          existing.quantity_sold += qtyInBase
+          existing.revenue += item.total_price
           existing.cost += itemCost
-          existing.profit += (itemRevenue - itemCost)
+          existing.profit = existing.revenue - existing.cost
         } else {
           productMap.set(product.id, {
             product_id: product.id,
             product_name: product.name,
             reference: product.reference,
-            quantity_sold: item.quantity,
-            revenue: itemRevenue,
+            quantity_sold: qtyInBase,
+            revenue: item.total_price,
             cost: itemCost,
-            profit: itemRevenue - itemCost,
+            profit: item.total_price - itemCost,
           })
         }
       }
     }
 
-    const productStats = Array.from(productMap.values()).sort((a, b) => b.profit - a.profit)
-    const grossProfit = totalRevenue - totalCost
-
-    // Dépenses de la période (loyer, transport, divers)
+    // 3. Dépenses de la période
     const { data: expensesData, error: expError } = await supabase
       .from('expenses')
       .select('amount')
-      .gte('expense_date', startDate)
-      .lte('expense_date', endDate)
+      .gte('expense_date', start)
+      .lte('expense_date', end)
     if (expError) throw expError
-    const totalExpenses = (expensesData || []).reduce((sum, e) => sum + e.amount, 0)
 
-    const resultatNet = grossProfit - totalExpenses
+    const expenses = (expensesData || []).reduce((s, e) => s + e.amount, 0)
+    const profit = revenue - cost
+    const resultatNet = profit - expenses
+
+    const productStats = Array.from(productMap.values())
+      .sort((a, b) => b.profit - a.profit)
 
     return {
-      revenue: totalRevenue,
-      cost: totalCost,
-      profit: grossProfit,
-      salesCount: sales?.length ?? 0,
-      expenses: totalExpenses,
+      revenue,
+      cost,
+      profit,
+      expenses,
       resultatNet,
+      salesCount: (sales || []).length,
       productStats,
     }
   },
 
   async getFondsRoulement(): Promise<FondsRoulement> {
+    // Valeur du stock
     const { data: products, error: pError } = await supabase
       .from('products')
       .select('stock_current, purchase_price')
       .eq('is_active', true)
     if (pError) throw pError
+
     const stockValue = (products || []).reduce(
-      (sum, p) => sum + p.stock_current * p.purchase_price, 0
+      (s, p) => s + p.stock_current * p.purchase_price, 0
     )
 
-    const { data: journal, error: jError } = await supabase
-      .from('journal_entries')
-      .select('balance')
-      .order('entry_date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-    const cashBalance = jError ? 0 : (journal?.balance ?? 0)
+    // Solde caisse = total encaissé
+    const { data: sales, error: sError } = await supabase
+      .from('sales')
+      .select('total_amount, montant_paye, statut')
+    if (sError) throw sError
 
+    const cashBalance = (sales || []).reduce((s, sale) => {
+      if (sale.statut === 'paye') return s + sale.total_amount
+      if (sale.statut === 'partiel') return s + (sale.montant_paye ?? 0)
+      return s
+    }, 0)
+
+    // Créances clients
     const { data: clients, error: cError } = await supabase
       .from('clients')
       .select('solde')
     if (cError) throw cError
-    const clientsReceivables = (clients || []).reduce((sum, c) => sum + c.solde, 0)
 
+    const clientsReceivables = (clients || []).reduce((s, c) => s + c.solde, 0)
+
+    // Dettes fournisseurs
     const { data: fournisseurs, error: fError } = await supabase
       .from('fournisseurs')
       .select('solde')
     if (fError) throw fError
-    const fournisseursDebts = (fournisseurs || []).reduce((sum, f) => sum + f.solde, 0)
+
+    const fournisseursDebts = (fournisseurs || []).reduce((s, f) => s + f.solde, 0)
 
     const total = stockValue + cashBalance + clientsReceivables - fournisseursDebts
 
-    return { stockValue, cashBalance, clientsReceivables, fournisseursDebts, total }
+    return {
+      stockValue,
+      cashBalance,
+      clientsReceivables,
+      fournisseursDebts,
+      total,
+    }
   },
 }
