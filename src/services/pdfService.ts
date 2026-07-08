@@ -2,7 +2,7 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
-import type { Sale, JournalEntry, Product } from '@/types'
+import type { Sale, JournalEntry, Product, ProductUnit } from '@/types'
 
 const STOCKAM_COLOR = [249, 115, 22] as [number, number, number]
 const DARK_COLOR = [15, 23, 42] as [number, number, number]
@@ -22,8 +22,36 @@ function getUnitPrefix(unitName?: string | null): string {
   if (u.startsWith('litre') || u.startsWith('l ')) return 'L.'
   if (u.startsWith('boite') || u.startsWith('boîte')) return 'Bte.'
   if (u.startsWith('lot')) return 'Lot.'
-  // Par défaut, prend les 4 premiers caractères
   return `${unitName.substring(0, 4)}.`
+}
+
+// Calcul affichage stock en conditionnements
+function formatStockDisplay(
+  stockCurrent: number,
+  baseUnit: string | undefined,
+  units: ProductUnit[]
+): string {
+  if (units.length === 0 || stockCurrent === 0) {
+    return `${stockCurrent} ${baseUnit || 'Pcs'}`
+  }
+
+  const sortedUnits = [...units].sort((a, b) => b.conversion_rate - a.conversion_rate)
+  let remaining = stockCurrent
+  const parts: string[] = []
+
+  for (const unit of sortedUnits) {
+    if (remaining >= unit.conversion_rate) {
+      const qty = Math.floor(remaining / unit.conversion_rate)
+      parts.push(`${qty} ${unit.unit_name}`)
+      remaining = remaining % unit.conversion_rate
+    }
+  }
+
+  if (remaining > 0) {
+    parts.push(`${remaining} ${baseUnit || 'Pcs'}`)
+  }
+
+  return parts.join(' + ')
 }
 
 function addHeader(doc: jsPDF, businessName: string, title: string) {
@@ -108,7 +136,6 @@ export const pdfService = {
     doc.text(statutLabel, 55, y)
     y += 10
 
-    // Tableau articles avec unités dans la désignation
     autoTable(doc, {
       startY: y,
       head: [['Désignation', 'Qté', 'Remise', 'Prix unit.', 'Total']],
@@ -137,10 +164,7 @@ export const pdfService = {
         lineColor: [226, 232, 240],
       },
       alternateRowStyles: { fillColor: [248, 250, 252] },
-      styles: {
-        fontSize: 9,
-        cellPadding: 4,
-      },
+      styles: { fontSize: 9, cellPadding: 4 },
       columnStyles: {
         0: { cellWidth: 70 },
         1: { halign: 'center' },
@@ -154,7 +178,6 @@ export const pdfService = {
 
     let finalY = (doc as any).lastAutoTable.finalY + 6
 
-    // Remise facture
     if ((sale.discount_amount ?? 0) > 0) {
       const subtotal = (sale.total_amount ?? 0) + (sale.discount_amount ?? 0)
       doc.setFontSize(9)
@@ -170,7 +193,6 @@ export const pdfService = {
       finalY += 6
     }
 
-    // Total
     doc.setFillColor(249, 250, 251)
     doc.rect(120, finalY - 4, 76, 9, 'F')
     doc.setFontSize(11)
@@ -185,20 +207,11 @@ export const pdfService = {
       doc.setFontSize(9)
       doc.setTextColor(239, 68, 68)
       doc.setFont('helvetica', 'normal')
-      doc.text(
-        `Montant payé : ${formatXOF(sale.montant_paye ?? 0)} XOF`,
-        196, finalY,
-        { align: 'right' }
-      )
+      doc.text(`Montant payé : ${formatXOF(sale.montant_paye ?? 0)} XOF`, 196, finalY, { align: 'right' })
       finalY += 6
-      doc.text(
-        `Reste dû : ${formatXOF(sale.total_amount - (sale.montant_paye ?? 0))} XOF`,
-        196, finalY,
-        { align: 'right' }
-      )
+      doc.text(`Reste dû : ${formatXOF(sale.total_amount - (sale.montant_paye ?? 0))} XOF`, 196, finalY, { align: 'right' })
     }
 
-    // Merci
     finalY += 12
     doc.setFontSize(8)
     doc.setTextColor(148, 163, 184)
@@ -266,7 +279,11 @@ export const pdfService = {
     doc.save(`journal-${format(new Date(), 'yyyy-MM-dd')}.pdf`)
   },
 
-  exportStock(products: Product[], businessName: string): void {
+  exportStock(
+    products: Product[],
+    businessName: string,
+    productUnits?: Record<string, ProductUnit[]>
+  ): void {
     const doc = new jsPDF()
     addHeader(doc, businessName, 'RAPPORT DE STOCK')
 
@@ -280,16 +297,20 @@ export const pdfService = {
 
     autoTable(doc, {
       startY: 40,
-      head: [['Référence', 'Produit', 'Catégorie', 'Stock', 'Min.', 'Prix achat', 'Valeur stock']],
-      body: products.map((p) => [
-        p.reference,
-        p.name,
-        p.category?.name ?? '—',
-        `${p.stock_current} ${p.base_unit || 'pcs'}`,
-        p.stock_minimum.toString(),
-        formatXOF(p.purchase_price),
-        formatXOF(p.stock_current * p.purchase_price),
-      ]),
+      head: [['Référence', 'Produit', 'Catégorie', 'Stock', 'Min.', 'Prix achat/u', 'Valeur stock']],
+      body: products.map((p) => {
+        const units = productUnits?.[p.id] ?? []
+        const stockDisplay = formatStockDisplay(p.stock_current, p.base_unit, units)
+        return [
+          p.reference,
+          p.name,
+          p.category?.name ?? '—',
+          stockDisplay,
+          p.stock_minimum.toString(),
+          `${formatXOF(p.purchase_price)} XOF`,
+          `${formatXOF(p.stock_current * p.purchase_price)} XOF`,
+        ]
+      }),
       headStyles: {
         fillColor: DARK_COLOR,
         textColor: [255, 255, 255],
