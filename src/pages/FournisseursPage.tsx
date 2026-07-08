@@ -11,9 +11,58 @@ import { useProducts } from '@/hooks/useProducts'
 import { useCategories } from '@/hooks/useProducts'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useRole } from '@/hooks/useRole'
+import { useCommerceType } from '@/hooks/useCommerceType'
+import { useProductUnits } from '@/hooks/useProductUnits'
 import { useNavigate } from 'react-router-dom'
 import { formatCurrency } from '@/lib/utils'
-import type { Fournisseur, PaymentMethod, AchatCartItem, AchatStatut } from '@/types'
+import type { Fournisseur, PaymentMethod, AchatCartItem, AchatStatut, ProductUnit } from '@/types'
+
+// Composant sélecteur d'unité d'achat
+function AchatUnitSelector({
+  productId,
+  baseUnit,
+  onSelect,
+}: {
+  productId: string
+  baseUnit?: string
+  onSelect: (unit: ProductUnit | null, conversionRate: number) => void
+}) {
+  const { units } = useProductUnits(productId)
+  const [selectedUnitId, setSelectedUnitId] = useState('')
+
+  const handleChange = (unitId: string) => {
+    setSelectedUnitId(unitId)
+    if (!unitId) {
+      onSelect(null, 1)
+    } else {
+      const unit = units.find((u) => u.id === unitId)
+      if (unit) onSelect(unit, unit.conversion_rate)
+    }
+  }
+
+  if (units.length === 0) return (
+    <div className="text-xs text-muted-foreground mt-1">
+      Unité : {baseUnit || 'Pièce'}
+    </div>
+  )
+
+  return (
+    <div className="mt-1">
+      <select
+        value={selectedUnitId}
+        onChange={(e) => handleChange(e.target.value)}
+        className="w-full h-7 rounded border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        <option value="">{baseUnit || 'Pièce'} (unité de base)</option>
+        {units.map((unit) => (
+          <option key={unit.id} value={unit.id}>
+            {unit.unit_name} = {unit.conversion_rate} {baseUnit || 'pcs'}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
 
 export default function FournisseursPage() {
   const {
@@ -25,6 +74,7 @@ export default function FournisseursPage() {
   const { categories, createCategory } = useCategories()
   const { canAccessClientsAndFournisseurs, isLoading: subLoading } = useSubscription()
   const { canViewFournisseurs, canManageFournisseurs, canManageAchats } = useRole()
+  const { isGrosDetail } = useCommerceType()
   const navigate = useNavigate()
 
   const [showForm, setShowForm] = useState(false)
@@ -42,6 +92,8 @@ export default function FournisseursPage() {
   const [selectedProductId, setSelectedProductId] = useState('')
   const [achatQty, setAchatQty] = useState(1)
   const [achatUnitPrice, setAchatUnitPrice] = useState('')
+  const [selectedAchatUnit, setSelectedAchatUnit] = useState<ProductUnit | null>(null)
+  const [selectedConversionRate, setSelectedConversionRate] = useState(1)
 
   const [showNewProduct, setShowNewProduct] = useState(false)
   const [newProductData, setNewProductData] = useState({
@@ -67,6 +119,10 @@ export default function FournisseursPage() {
     : 0
 
   const activeProducts = useMemo(() => products.filter((p) => p.is_active), [products])
+  const selectedProduct = products.find((p) => p.id === selectedProductId)
+
+  // Quantité en unité de base calculée automatiquement
+  const quantiteEnBase = achatQty * selectedConversionRate
 
   const openCreate = () => {
     setEditingFourn(null)
@@ -111,26 +167,49 @@ export default function FournisseursPage() {
     setSelectedProductId('')
     setAchatQty(1)
     setAchatUnitPrice('')
+    setSelectedAchatUnit(null)
+    setSelectedConversionRate(1)
   }
 
   const addToAchatCart = () => {
     const product = products.find((p) => p.id === selectedProductId)
     if (!product || !achatUnitPrice || achatQty < 1) return
     const unitPrice = parseFloat(achatUnitPrice)
+
+    // Quantité en unité de base
+    const qtyInBase = achatQty * selectedConversionRate
+
     setAchatCart((prev) => {
-      const existing = prev.find((i) => i.product.id === product.id)
+      const key = `${product.id}-${selectedAchatUnit?.id ?? 'base'}`
+      const existing = prev.find((i) => `${i.product.id}-${(i as any).unit_id ?? 'base'}` === key)
       if (existing) {
-        return prev.map((i) =>
-          i.product.id === product.id
-            ? { ...i, quantity: i.quantity + achatQty, total_price: (i.quantity + achatQty) * i.unit_price }
-            : i
-        )
+        return prev.map((i) => {
+          if (`${i.product.id}-${(i as any).unit_id ?? 'base'}` !== key) return i
+          const newQty = i.quantity + achatQty
+          return {
+            ...i,
+            quantity: newQty,
+            total_price: newQty * i.unit_price,
+          }
+        })
       }
-      return [...prev, { product, quantity: achatQty, unit_price: unitPrice, total_price: achatQty * unitPrice }]
+      return [...prev, {
+        product,
+        quantity: achatQty,
+        unit_price: unitPrice,
+        total_price: achatQty * unitPrice,
+        // Infos unité
+        unit_id: selectedAchatUnit?.id ?? null,
+        unit_name: selectedAchatUnit?.unit_name ?? (product.base_unit || 'Pièce'),
+        conversion_rate: selectedConversionRate,
+        quantity_in_base: qtyInBase,
+      } as any]
     })
     setSelectedProductId('')
     setAchatQty(1)
     setAchatUnitPrice('')
+    setSelectedAchatUnit(null)
+    setSelectedConversionRate(1)
   }
 
   const removeFromAchatCart = (productId: string) => {
@@ -139,9 +218,16 @@ export default function FournisseursPage() {
 
   const updateAchatQty = (productId: string, newQty: number) => {
     if (newQty <= 0) { removeFromAchatCart(productId); return }
-    setAchatCart((prev) => prev.map((i) =>
-      i.product.id === productId ? { ...i, quantity: newQty, total_price: newQty * i.unit_price } : i
-    ))
+    setAchatCart((prev) => prev.map((i) => {
+      if (i.product.id !== productId) return i
+      const convRate = (i as any).conversion_rate ?? 1
+      return {
+        ...i,
+        quantity: newQty,
+        total_price: newQty * i.unit_price,
+        quantity_in_base: newQty * convRate,
+      }
+    }))
   }
 
   const handleAchat = async () => {
@@ -219,7 +305,6 @@ export default function FournisseursPage() {
 
   if (isLoading || subLoading) return <LoadingScreen text="Chargement des fournisseurs..." />
 
-  // Blocage plan Starter
   if (!canAccessClientsAndFournisseurs) {
     return (
       <div className="space-y-5">
@@ -254,7 +339,6 @@ export default function FournisseursPage() {
     )
   }
 
-  // Blocage par rôle
   if (!canViewFournisseurs) {
     return (
       <div className="flex flex-col items-center justify-center py-16 space-y-4 text-center">
@@ -399,6 +483,8 @@ export default function FournisseursPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-2">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 space-y-4">
             <h2 className="font-semibold text-lg">Facture d'achat — {achatFourn.name}</h2>
+
+            {/* Ajout produit */}
             <Card className="p-3 space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">Ajouter un produit</p>
@@ -406,28 +492,62 @@ export default function FournisseursPage() {
                   <Plus className="h-3 w-3" /> Nouveau produit
                 </button>
               </div>
+
               <select
                 value={selectedProductId}
                 onChange={(e) => {
-                  setSelectedProductId(e.target.value)
                   const p = products.find((x) => x.id === e.target.value)
+                  setSelectedProductId(e.target.value)
+                  setSelectedAchatUnit(null)
+                  setSelectedConversionRate(1)
                   if (p) setAchatUnitPrice(p.purchase_price.toString())
                 }}
                 className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
               >
                 <option value="">Sélectionner un produit...</option>
                 {activeProducts.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name} (stock: {p.stock_current})</option>
+                  <option key={p.id} value={p.id}>{p.name} (stock: {p.stock_current} {p.base_unit || 'pcs'})</option>
                 ))}
               </select>
+
+              {/* Sélecteur unité d'achat pour gros & détail */}
+              {selectedProductId && isGrosDetail && (
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600">Unité d'achat</label>
+                  <AchatUnitSelector
+                    productId={selectedProductId}
+                    baseUnit={selectedProduct?.base_unit}
+                    onSelect={(unit, rate) => {
+                      setSelectedAchatUnit(unit)
+                      setSelectedConversionRate(rate)
+                    }}
+                  />
+                </div>
+              )}
+
               <div className="flex gap-2">
                 <div className="flex-1">
                   <label className="text-xs text-muted-foreground">Prix achat (XOF)</label>
-                  <input type="number" value={achatUnitPrice} onChange={(e) => setAchatUnitPrice(e.target.value)} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" placeholder="0" />
+                  <input
+                    type="number"
+                    value={achatUnitPrice}
+                    onChange={(e) => setAchatUnitPrice(e.target.value)}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    placeholder="0"
+                  />
                 </div>
-                <div className="w-20">
-                  <label className="text-xs text-muted-foreground">Qté</label>
-                  <input type="number" min="1" value={achatQty} onChange={(e) => setAchatQty(parseInt(e.target.value) || 1)} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-center" />
+                <div className="w-24">
+                  <label className="text-xs text-muted-foreground">
+                    Qté {selectedAchatUnit ? `(${selectedAchatUnit.unit_name})` : ''}
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={achatQty}
+                    onChange={(e) => setAchatQty(parseInt(e.target.value) || 1)}
+                    onFocus={(e) => e.target.select()}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-center"
+                  />
                 </div>
                 <div className="flex items-end">
                   <Button onClick={addToAchatCart} disabled={!selectedProductId || !achatUnitPrice}>
@@ -435,14 +555,26 @@ export default function FournisseursPage() {
                   </Button>
                 </div>
               </div>
+
+              {/* Affichage conversion automatique */}
+              {selectedProductId && isGrosDetail && selectedConversionRate > 1 && achatQty > 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-md px-3 py-2">
+                  <p className="text-xs text-orange-700 font-medium">
+                    {achatQty} {selectedAchatUnit?.unit_name ?? selectedProduct?.base_unit ?? 'unité'}(s)
+                    = <strong>{quantiteEnBase} {selectedProduct?.base_unit || 'pcs'}</strong> seront ajoutés au stock
+                  </p>
+                </div>
+              )}
             </Card>
 
+            {/* Tableau panier */}
             {achatCart.length > 0 && (
               <div className="border rounded-lg overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Produit</TableHead>
+                      {isGrosDetail && <TableHead>Unité</TableHead>}
                       <TableHead className="text-center">Qté</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                       <TableHead></TableHead>
@@ -455,6 +587,18 @@ export default function FournisseursPage() {
                           <p className="text-sm font-medium">{item.product.name}</p>
                           <p className="text-xs text-muted-foreground">{formatCurrency(item.unit_price)}/u</p>
                         </TableCell>
+                        {isGrosDetail && (
+                          <TableCell>
+                            <span className="text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded">
+                              {(item as any).unit_name || item.product.base_unit || 'Pièce'}
+                            </span>
+                            {(item as any).conversion_rate > 1 && (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                = {(item as any).quantity_in_base} {item.product.base_unit || 'pcs'}
+                              </p>
+                            )}
+                          </TableCell>
+                        )}
                         <TableCell>
                           <div className="flex items-center justify-center gap-1">
                             <button onClick={() => updateAchatQty(item.product.id, item.quantity - 1)} className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted">
@@ -483,6 +627,7 @@ export default function FournisseursPage() {
               </div>
             )}
 
+            {/* Mode règlement */}
             <div className="space-y-3">
               <Select
                 label="Mode de règlement"
@@ -525,6 +670,7 @@ export default function FournisseursPage() {
                 <textarea value={achatNotes} onChange={(e) => setAchatNotes(e.target.value)} rows={2} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
               </div>
             </div>
+
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setAchatFourn(null)}>Annuler</Button>
               <Button className="flex-1" onClick={handleAchat} isLoading={achatSubmitting} disabled={achatCart.length === 0}>
