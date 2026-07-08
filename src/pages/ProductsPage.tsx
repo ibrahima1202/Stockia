@@ -169,7 +169,7 @@ function StockDisplay({ product }: { product: Product }) {
   const { units } = useProductUnits(product.id)
   if (units.length === 0 || product.stock_current === 0) {
     return (
-      <StockDisplay product={product} />
+      <StockDisplay product={p} />
     )
   }
   const sortedUnits = [...units].sort((a, b) => b.conversion_rate - a.conversion_rate)
