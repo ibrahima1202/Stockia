@@ -10,7 +10,7 @@ import { useProducts } from '@/hooks/useProducts'
 import { useRole } from '@/hooks/useRole'
 import { useCommerceType } from '@/hooks/useCommerceType'
 import { useProductUnits } from '@/hooks/useProductUnits'
-import { formatCurrency, formatDateTime } from '@/lib/utils'
+import { formatDateTime } from '@/lib/utils'
 import { useToast } from '@/store/toastStore'
 import type { ProductUnit } from '@/types'
 
