@@ -247,7 +247,7 @@ export default function StatsPage() {
                       <p className="text-sm font-medium">{p.product_name}</p>
                       <p className="text-xs text-muted-foreground font-mono">{p.reference}</p>
                     </TableCell>
-                    <TableCell className="text-center text-sm">{p.quantity_sold}</TableCell>
+                    <TableCell className="text-center text-sm">{p.quantity_sold_display}</TableCell>
                     <TableCell className="text-right text-sm">{formatCurrency(p.revenue)}</TableCell>
                     <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(p.cost)}</TableCell>
                     <TableCell className="text-right">
