@@ -11,6 +11,21 @@ function formatXOF(amount: number): string {
   return amount.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 }
 
+function getUnitPrefix(unitName?: string | null): string {
+  if (!unitName) return ''
+  const u = unitName.toLowerCase()
+  if (u.startsWith('pièce') || u.startsWith('piece') || u === 'pcs') return 'Pcs.'
+  if (u.startsWith('pack')) return 'Pack.'
+  if (u.startsWith('carton') || u.startsWith('cart')) return 'Cart.'
+  if (u.startsWith('sac')) return 'Sac.'
+  if (u.startsWith('kg') || u.startsWith('kilo')) return 'Kg.'
+  if (u.startsWith('litre') || u.startsWith('l ')) return 'L.'
+  if (u.startsWith('boite') || u.startsWith('boîte')) return 'Bte.'
+  if (u.startsWith('lot')) return 'Lot.'
+  // Par défaut, prend les 4 premiers caractères
+  return `${unitName.substring(0, 4)}.`
+}
+
 function addHeader(doc: jsPDF, businessName: string, title: string) {
   doc.setFillColor(...DARK_COLOR)
   doc.rect(0, 0, 210, 28, 'F')
@@ -93,17 +108,23 @@ export const pdfService = {
     doc.text(statutLabel, 55, y)
     y += 10
 
-    // Tableau articles avec bordures
+    // Tableau articles avec unités dans la désignation
     autoTable(doc, {
       startY: y,
       head: [['Désignation', 'Qté', 'Remise', 'Prix unit.', 'Total']],
-      body: (sale.sale_items || []).map((item) => [
-        item.product?.name ?? '—',
-        item.quantity.toString(),
-        (item.discount_amount ?? 0) > 0 ? `-${formatXOF(item.discount_amount!)} XOF` : '—',
-        `${formatXOF(item.unit_price)} XOF`,
-        `${formatXOF(item.total_price)} XOF`,
-      ]),
+      body: (sale.sale_items || []).map((item) => {
+        const prefix = getUnitPrefix(item.unit_name)
+        const designation = prefix
+          ? `${prefix} ${item.product?.name ?? '—'}`
+          : item.product?.name ?? '—'
+        return [
+          designation,
+          item.quantity.toString(),
+          (item.discount_amount ?? 0) > 0 ? `-${formatXOF(item.discount_amount!)} XOF` : '—',
+          `${formatXOF(item.unit_price)} XOF`,
+          `${formatXOF(item.total_price)} XOF`,
+        ]
+      }),
       headStyles: {
         fillColor: DARK_COLOR,
         textColor: [255, 255, 255],
@@ -264,7 +285,7 @@ export const pdfService = {
         p.reference,
         p.name,
         p.category?.name ?? '—',
-        p.stock_current.toString(),
+        `${p.stock_current} ${p.base_unit || 'pcs'}`,
         p.stock_minimum.toString(),
         formatXOF(p.purchase_price),
         formatXOF(p.stock_current * p.purchase_price),
