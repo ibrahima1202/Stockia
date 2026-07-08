@@ -5,6 +5,7 @@ export interface ProductStat {
   product_name: string
   reference: string
   quantity_sold: number
+  quantity_sold_display: string
   revenue: number
   cost: number
   profit: number
@@ -42,6 +43,7 @@ type SaleItemData = {
   discount_amount: number | null
   quantity_in_base: number | null
   conversion_rate: number | null
+  unit_name: string | null
   product: ProductData | ProductData[] | null
 }
 
@@ -61,7 +63,7 @@ export const statsService = {
         id, total_amount, montant_paye, statut,
         sale_items(
           quantity, unit_price, total_price, discount_amount,
-          quantity_in_base, conversion_rate,
+          quantity_in_base, conversion_rate, unit_name,
           product:products(id, name, reference, purchase_price)
         )
       `)
@@ -89,6 +91,8 @@ export const statsService = {
         if (!product) continue
 
         const qtyInBase = item.quantity_in_base ?? item.quantity
+        const convRate = item.conversion_rate ?? 1
+        const unitNm = item.unit_name
         const itemCost = product.purchase_price * qtyInBase
         cost += itemCost
 
@@ -98,12 +102,26 @@ export const statsService = {
           existing.revenue += item.total_price
           existing.cost += itemCost
           existing.profit = existing.revenue - existing.cost
+
+          // Mise à jour affichage quantité
+          if (unitNm && convRate > 1) {
+            const unitQty = Math.round(existing.quantity_sold / convRate)
+            existing.quantity_sold_display = `${unitQty} ${unitNm} (${existing.quantity_sold} pcs)`
+          } else {
+            existing.quantity_sold_display = `${existing.quantity_sold} pcs`
+          }
         } else {
+          // Calcul affichage quantité
+          const quantityDisplay = unitNm && convRate > 1
+            ? `${item.quantity} ${unitNm} (${qtyInBase} pcs)`
+            : `${qtyInBase} pcs`
+
           productMap.set(product.id, {
             product_id: product.id,
             product_name: product.name,
             reference: product.reference,
             quantity_sold: qtyInBase,
+            quantity_sold_display: quantityDisplay,
             revenue: item.total_price,
             cost: itemCost,
             profit: item.total_price - itemCost,
