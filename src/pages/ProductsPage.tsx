@@ -159,8 +159,18 @@ function ProductUnitsManager({ product, onClose }: { product: Product; onClose: 
   )
 }
 
-function StockDisplay({ product }: { product: Product }) {
+function StockDisplayWithCache({
+  product,
+  onUnitsLoaded,
+}: {
+  product: Product
+  onUnitsLoaded: (units: ProductUnit[]) => void
+}) {
   const { units } = useProductUnits(product.id)
+
+  useMemo(() => {
+    if (units.length > 0) onUnitsLoaded(units)
+  }, [units]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (units.length === 0 || product.stock_current === 0) {
     return (
@@ -194,18 +204,6 @@ function StockDisplay({ product }: { product: Product }) {
       <p className="text-xs text-muted-foreground">= {product.stock_current} {product.base_unit || 'pcs'}</p>
     </div>
   )
-}
-
-// Hook pour collecter toutes les unités des produits filtrés
-function useAllProductUnits(productIds: string[]): Record<string, ProductUnit[]> {
-  const [allUnits, setAllUnits] = useState<Record<string, ProductUnit[]>>({})
-
-  useMemo(() => {
-    // On utilise les unités déjà chargées dans StockDisplay
-    // Ce hook est uniquement pour l'export PDF
-  }, [productIds])
-
-  return allUnits
 }
 
 export default function ProductsPage() {
@@ -623,54 +621,6 @@ export default function ProductsPage() {
           <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Annuler</Button>
         </div>
       </Modal>
-    </div>
-  )
-}
-
-// Composant StockDisplay avec cache pour l'export PDF
-function StockDisplayWithCache({
-  product,
-  onUnitsLoaded,
-}: {
-  product: Product
-  onUnitsLoaded: (units: ProductUnit[]) => void
-}) {
-  const { units } = useProductUnits(product.id)
-
-  useMemo(() => {
-    if (units.length > 0) onUnitsLoaded(units)
-  }, [units]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (units.length === 0 || product.stock_current === 0) {
-    return (
-      <Badge variant={product.stock_current === 0 ? 'danger' : product.stock_current <= product.stock_minimum ? 'warning' : 'success'}>
-        {product.stock_current} {product.base_unit || 'Pcs'}
-      </Badge>
-    )
-  }
-
-  const sortedUnits = [...units].sort((a, b) => b.conversion_rate - a.conversion_rate)
-  let remaining = product.stock_current
-  const parts: string[] = []
-
-  for (const unit of sortedUnits) {
-    if (remaining >= unit.conversion_rate) {
-      const qty = Math.floor(remaining / unit.conversion_rate)
-      parts.push(`${qty} ${unit.unit_name}`)
-      remaining = remaining % unit.conversion_rate
-    }
-  }
-
-  if (remaining > 0) parts.push(`${remaining} ${product.base_unit || 'Pcs'}`)
-
-  const isLow = product.stock_current <= product.stock_minimum
-
-  return (
-    <div className="space-y-0.5">
-      <Badge variant={product.stock_current === 0 ? 'danger' : isLow ? 'warning' : 'success'}>
-        {parts.join(' + ')}
-      </Badge>
-      <p className="text-xs text-muted-foreground">= {product.stock_current} {product.base_unit || 'pcs'}</p>
     </div>
   )
 }
