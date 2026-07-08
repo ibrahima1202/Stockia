@@ -28,10 +28,34 @@ export interface FondsRoulement {
   total: number
 }
 
+type ProductData = {
+  id: string
+  name: string
+  reference: string
+  purchase_price: number
+}
+
+type SaleItemData = {
+  quantity: number
+  unit_price: number
+  total_price: number
+  discount_amount: number | null
+  quantity_in_base: number | null
+  conversion_rate: number | null
+  product: ProductData | ProductData[] | null
+}
+
+type SaleData = {
+  id: string
+  total_amount: number
+  montant_paye: number | null
+  statut: string | null
+  sale_items: SaleItemData[]
+}
+
 export const statsService = {
   async getPeriodStats(start: string, end: string): Promise<PeriodStats> {
-    // 1. Récupérer les ventes avec leurs articles
-    const { data: sales, error: salesError } = await supabase
+    const { data: salesRaw, error: salesError } = await supabase
       .from('sales')
       .select(`
         id, total_amount, montant_paye, statut,
@@ -45,32 +69,29 @@ export const statsService = {
       .lte('created_at', `${end}T23:59:59`)
     if (salesError) throw salesError
 
-    // 2. Calculer le CA et le coût
+    const sales = (salesRaw ?? []) as unknown as SaleData[]
+
     let revenue = 0
     let cost = 0
     const productMap = new Map<string, ProductStat>()
 
-    for (const sale of sales || []) {
-      // CA = montant effectivement encaissé
+    for (const sale of sales) {
       if (sale.statut === 'paye') {
         revenue += sale.total_amount
       } else if (sale.statut === 'partiel') {
         revenue += sale.montant_paye ?? 0
       }
-      // Pour le crédit, on ne compte pas dans le CA encaissé
 
       for (const item of sale.sale_items || []) {
-        const product = item.product
+        const product = Array.isArray(item.product)
+          ? item.product[0]
+          : item.product
         if (!product) continue
 
-        // Quantité réelle vendue en unité de base
         const qtyInBase = item.quantity_in_base ?? item.quantity
-
-        // Coût = prix d'achat × quantité en unité de base
         const itemCost = product.purchase_price * qtyInBase
         cost += itemCost
 
-        // Agrégation par produit
         const existing = productMap.get(product.id)
         if (existing) {
           existing.quantity_sold += qtyInBase
@@ -91,7 +112,6 @@ export const statsService = {
       }
     }
 
-    // 3. Dépenses de la période
     const { data: expensesData, error: expError } = await supabase
       .from('expenses')
       .select('amount')
@@ -112,13 +132,12 @@ export const statsService = {
       profit,
       expenses,
       resultatNet,
-      salesCount: (sales || []).length,
+      salesCount: sales.length,
       productStats,
     }
   },
 
   async getFondsRoulement(): Promise<FondsRoulement> {
-    // Valeur du stock
     const { data: products, error: pError } = await supabase
       .from('products')
       .select('stock_current, purchase_price')
@@ -129,7 +148,6 @@ export const statsService = {
       (s, p) => s + p.stock_current * p.purchase_price, 0
     )
 
-    // Solde caisse = total encaissé
     const { data: sales, error: sError } = await supabase
       .from('sales')
       .select('total_amount, montant_paye, statut')
@@ -141,7 +159,6 @@ export const statsService = {
       return s
     }, 0)
 
-    // Créances clients
     const { data: clients, error: cError } = await supabase
       .from('clients')
       .select('solde')
@@ -149,7 +166,6 @@ export const statsService = {
 
     const clientsReceivables = (clients || []).reduce((s, c) => s + c.solde, 0)
 
-    // Dettes fournisseurs
     const { data: fournisseurs, error: fError } = await supabase
       .from('fournisseurs')
       .select('solde')
