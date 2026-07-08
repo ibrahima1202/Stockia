@@ -10,7 +10,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useProducts } from '@/hooks/useProducts'
-import { useProductUnits } from '@/hooks/useProductUnits'
 import { useRole } from '@/hooks/useRole'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useCommerceType } from '@/hooks/useCommerceType'
@@ -170,7 +169,7 @@ function StockDisplay({ product }: { product: Product }) {
   const { units } = useProductUnits(product.id)
   if (units.length === 0 || product.stock_current === 0) {
     return (
-      <StockDisplay product={p} />
+      <StockDisplay product={product} />
     )
   }
   const sortedUnits = [...units].sort((a, b) => b.conversion_rate - a.conversion_rate)
