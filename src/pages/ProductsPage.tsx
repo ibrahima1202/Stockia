@@ -17,7 +17,7 @@ import { useProductUnits } from '@/hooks/useProductUnits'
 import { useToast } from '@/store/toastStore'
 import { formatCurrency } from '@/lib/utils'
 import { pdfService } from '@/services/pdfService'
-import type { Product } from '@/types'
+import type { Product, ProductUnit } from '@/types'
 
 const productSchema = z.object({
   name: z.string().min(2, 'Nom requis'),
@@ -196,6 +196,18 @@ function StockDisplay({ product }: { product: Product }) {
   )
 }
 
+// Hook pour collecter toutes les unités des produits filtrés
+function useAllProductUnits(productIds: string[]): Record<string, ProductUnit[]> {
+  const [allUnits, setAllUnits] = useState<Record<string, ProductUnit[]>>({})
+
+  useMemo(() => {
+    // On utilise les unités déjà chargées dans StockDisplay
+    // Ce hook est uniquement pour l'export PDF
+  }, [productIds])
+
+  return allUnits
+}
+
 export default function ProductsPage() {
   const { products, categories, isLoading, createProduct, updateProduct, deleteProduct, createCategory } = useProducts()
   const { canManageProducts, canExportPDFRole } = useRole()
@@ -214,6 +226,7 @@ export default function ProductsPage() {
   const [newCategoryName, setNewCategoryName] = useState('')
   const [categorySubmitting, setCategorySubmitting] = useState(false)
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
+  const [cachedUnits, setCachedUnits] = useState<Record<string, ProductUnit[]>>({})
 
   const {
     register,
@@ -303,7 +316,11 @@ export default function ProductsPage() {
   }
 
   const handleExportStock = () => {
-    pdfService.exportStock(filtered, business?.name ?? 'Mon Commerce')
+    pdfService.exportStock(
+      filtered,
+      business?.name ?? 'Mon Commerce',
+      isGrosDetail ? cachedUnits : undefined
+    )
   }
 
   const canExport = canExportPDF && canExportPDFRole
@@ -409,7 +426,12 @@ export default function ProductsPage() {
                     <TableCell className="text-right text-sm font-semibold">{formatCurrency(p.selling_price)}</TableCell>
                     <TableCell className="text-right">
                       {isGrosDetail ? (
-                        <StockDisplay product={p} />
+                        <StockDisplayWithCache
+                          product={p}
+                          onUnitsLoaded={(units) => {
+                            setCachedUnits((prev) => ({ ...prev, [p.id]: units }))
+                          }}
+                        />
                       ) : (
                         <Badge variant={p.stock_current === 0 ? 'danger' : isLow ? 'warning' : 'success'}>
                           {p.stock_current} {p.base_unit || ''}
@@ -601,6 +623,54 @@ export default function ProductsPage() {
           <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Annuler</Button>
         </div>
       </Modal>
+    </div>
+  )
+}
+
+// Composant StockDisplay avec cache pour l'export PDF
+function StockDisplayWithCache({
+  product,
+  onUnitsLoaded,
+}: {
+  product: Product
+  onUnitsLoaded: (units: ProductUnit[]) => void
+}) {
+  const { units } = useProductUnits(product.id)
+
+  useMemo(() => {
+    if (units.length > 0) onUnitsLoaded(units)
+  }, [units]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (units.length === 0 || product.stock_current === 0) {
+    return (
+      <Badge variant={product.stock_current === 0 ? 'danger' : product.stock_current <= product.stock_minimum ? 'warning' : 'success'}>
+        {product.stock_current} {product.base_unit || 'Pcs'}
+      </Badge>
+    )
+  }
+
+  const sortedUnits = [...units].sort((a, b) => b.conversion_rate - a.conversion_rate)
+  let remaining = product.stock_current
+  const parts: string[] = []
+
+  for (const unit of sortedUnits) {
+    if (remaining >= unit.conversion_rate) {
+      const qty = Math.floor(remaining / unit.conversion_rate)
+      parts.push(`${qty} ${unit.unit_name}`)
+      remaining = remaining % unit.conversion_rate
+    }
+  }
+
+  if (remaining > 0) parts.push(`${remaining} ${product.base_unit || 'Pcs'}`)
+
+  const isLow = product.stock_current <= product.stock_minimum
+
+  return (
+    <div className="space-y-0.5">
+      <Badge variant={product.stock_current === 0 ? 'danger' : isLow ? 'warning' : 'success'}>
+        {parts.join(' + ')}
+      </Badge>
+      <p className="text-xs text-muted-foreground">= {product.stock_current} {product.base_unit || 'pcs'}</p>
     </div>
   )
 }
