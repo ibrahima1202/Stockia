@@ -168,9 +168,9 @@ function ProductUnitsManager({ product, onClose }: { product: Product; onClose: 
 function StockDisplay({ product }: { product: Product }) {
   const { units } = useProductUnits(product.id)
   if (units.length === 0 || product.stock_current === 0) {
-    return (
-      <StockDisplay product={p} />
-    )
+    return (  )
+
+       <StockDisplay product={p} />
   }
   const sortedUnits = [...units].sort((a, b) => b.conversion_rate - a.conversion_rate)
   let remaining = product.stock_current
