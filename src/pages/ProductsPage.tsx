@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useProducts } from '@/hooks/useProducts'
+import { useProductUnits } from '@/hooks/useProductUnits'
 import { useRole } from '@/hooks/useRole'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useCommerceType } from '@/hooks/useCommerceType'
@@ -165,7 +166,34 @@ function ProductUnitsManager({ product, onClose }: { product: Product; onClose: 
     </div>
   )
 }
-
+function StockDisplay({ product }: { product: Product }) {
+  const { units } = useProductUnits(product.id)
+  if (units.length === 0 || product.stock_current === 0) {
+    return (
+      <StockDisplay product={p} />
+    )
+  }
+  const sortedUnits = [...units].sort((a, b) => b.conversion_rate - a.conversion_rate)
+  let remaining = product.stock_current
+  const parts: string[] = []
+  for (const unit of sortedUnits) {
+    if (remaining >= unit.conversion_rate) {
+      const qty = Math.floor(remaining / unit.conversion_rate)
+      parts.push(`${qty} ${unit.unit_name}`)
+      remaining = remaining % unit.conversion_rate
+    }
+  }
+  if (remaining > 0) parts.push(`${remaining} ${product.base_unit || 'Pcs'}`)
+  const isLow = product.stock_current <= product.stock_minimum
+  return (
+    <div className="space-y-0.5">
+      <Badge variant={product.stock_current === 0 ? 'danger' : isLow ? 'warning' : 'success'}>
+        {parts.join(' + ')}
+      </Badge>
+      <p className="text-xs text-muted-foreground">= {product.stock_current} {product.base_unit || 'pcs'}</p>
+    </div>
+  )
+}
 export default function ProductsPage() {
   const { products, categories, isLoading, createProduct, updateProduct, deleteProduct, createCategory } = useProducts()
   const { canManageProducts, canExportPDFRole } = useRole()
