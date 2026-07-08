@@ -8,13 +8,63 @@ import { Button } from '@/components/ui/button'
 import { useStocks } from '@/hooks/useStocks'
 import { useProducts } from '@/hooks/useProducts'
 import { useRole } from '@/hooks/useRole'
-import { formatDateTime } from '@/lib/utils'
+import { useCommerceType } from '@/hooks/useCommerceType'
+import { useProductUnits } from '@/hooks/useProductUnits'
+import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { useToast } from '@/store/toastStore'
+import type { ProductUnit } from '@/types'
+
+// Sélecteur d'unité pour les mouvements de stock
+function StockUnitSelector({
+  productId,
+  baseUnit,
+  onSelect,
+}: {
+  productId: string
+  baseUnit?: string
+  onSelect: (unit: ProductUnit | null, conversionRate: number) => void
+}) {
+  const { units } = useProductUnits(productId)
+  const [selectedUnitId, setSelectedUnitId] = useState('')
+
+  const handleChange = (unitId: string) => {
+    setSelectedUnitId(unitId)
+    if (!unitId) {
+      onSelect(null, 1)
+    } else {
+      const unit = units.find((u) => u.id === unitId)
+      if (unit) onSelect(unit, unit.conversion_rate)
+    }
+  }
+
+  if (units.length === 0) return (
+    <p className="text-xs text-muted-foreground mt-1">Unité : {baseUnit || 'Pièce'}</p>
+  )
+
+  return (
+    <div className="space-y-1">
+      <label className="block text-xs font-medium text-slate-600">Unité</label>
+      <select
+        value={selectedUnitId}
+        onChange={(e) => handleChange(e.target.value)}
+        className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        <option value="">{baseUnit || 'Pièce'} (unité de base)</option>
+        {units.map((unit) => (
+          <option key={unit.id} value={unit.id}>
+            {unit.unit_name} = {unit.conversion_rate} {baseUnit || 'pcs'}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
 
 export default function StocksPage() {
   const { movements, isLoading, addMovement } = useStocks()
   const { products } = useProducts()
   const { canManageStock } = useRole()
+  const { isGrosDetail } = useCommerceType()
   const toast = useToast()
 
   const [showForm, setShowForm] = useState(false)
@@ -24,22 +74,40 @@ export default function StocksPage() {
     quantity: 1,
     reason: '',
   })
+  const [selectedUnit, setSelectedUnit] = useState<ProductUnit | null>(null)
+  const [conversionRate, setConversionRate] = useState(1)
   const [submitting, setSubmitting] = useState(false)
 
   const activeProducts = products.filter((p) => p.is_active)
+  const selectedProduct = products.find((p) => p.id === formData.product_id)
+
+  // Quantité en unité de base
+  const quantityInBase = formData.quantity * conversionRate
+
+  const handleProductChange = (productId: string) => {
+    setFormData({ ...formData, product_id: productId })
+    setSelectedUnit(null)
+    setConversionRate(1)
+  }
 
   const handleSubmit = async () => {
     if (!formData.product_id || formData.quantity < 1) return
     setSubmitting(true)
     try {
+      const unitLabel = selectedUnit
+        ? `${formData.quantity} ${selectedUnit.unit_name} (${quantityInBase} ${selectedProduct?.base_unit || 'pcs'})`
+        : null
+
       await addMovement(
         formData.product_id,
         formData.type,
-        formData.quantity,
-        formData.reason
+        quantityInBase, // toujours en unité de base
+        formData.reason + (unitLabel ? ` — ${unitLabel}` : ''),
       )
       setShowForm(false)
       setFormData({ product_id: '', type: 'entree', quantity: 1, reason: '' })
+      setSelectedUnit(null)
+      setConversionRate(1)
       toast.success('Mouvement enregistré')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erreur'
@@ -51,7 +119,6 @@ export default function StocksPage() {
 
   if (isLoading) return <LoadingScreen text="Chargement des stocks..." />
 
-  // Blocage par rôle
   if (!canManageStock) {
     return (
       <div className="flex flex-col items-center justify-center py-16 space-y-4 text-center">
@@ -134,6 +201,9 @@ export default function StocksPage() {
                     <span className={mv.type === 'entree' ? 'text-emerald-600' : 'text-red-500'}>
                       {mv.type === 'entree' ? '+' : '-'}{mv.quantity}
                     </span>
+                    {mv.product?.base_unit && (
+                      <span className="text-xs text-muted-foreground ml-1">{mv.product.base_unit}</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{mv.reason ?? '—'}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{formatDateTime(mv.created_at)}</TableCell>
@@ -150,21 +220,37 @@ export default function StocksPage() {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
             <h2 className="font-semibold text-lg">Nouveau mouvement de stock</h2>
             <div className="space-y-3">
+
+              {/* Produit */}
               <div>
                 <label className="block text-sm font-medium mb-1">Produit *</label>
                 <select
                   value={formData.product_id}
-                  onChange={(e) => setFormData({ ...formData, product_id: e.target.value })}
+                  onChange={(e) => handleProductChange(e.target.value)}
                   className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
                   <option value="">Sélectionner un produit...</option>
                   {activeProducts.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} (stock actuel: {p.stock_current})
+                      {p.name} (stock: {p.stock_current} {p.base_unit || 'pcs'})
                     </option>
                   ))}
                 </select>
               </div>
+
+              {/* Sélecteur unité — uniquement pour gros & détail */}
+              {formData.product_id && isGrosDetail && selectedProduct && (
+                <StockUnitSelector
+                  productId={formData.product_id}
+                  baseUnit={selectedProduct.base_unit}
+                  onSelect={(unit, rate) => {
+                    setSelectedUnit(unit)
+                    setConversionRate(rate)
+                  }}
+                />
+              )}
+
+              {/* Type mouvement */}
               <div>
                 <label className="block text-sm font-medium mb-1">Type *</label>
                 <div className="flex gap-2">
@@ -186,8 +272,12 @@ export default function StocksPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Quantité */}
               <div>
-                <label className="block text-sm font-medium mb-1">Quantité *</label>
+                <label className="block text-sm font-medium mb-1">
+                  Quantité {selectedUnit ? `(${selectedUnit.unit_name})` : selectedProduct?.base_unit ? `(${selectedProduct.base_unit})` : ''} *
+                </label>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setFormData({ ...formData, quantity: Math.max(1, formData.quantity - 1) })}
@@ -200,6 +290,7 @@ export default function StocksPage() {
                     min="1"
                     value={formData.quantity}
                     onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
+                    onFocus={(e) => e.target.select()}
                     className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   />
                   <button
@@ -209,7 +300,20 @@ export default function StocksPage() {
                     <Plus className="h-4 w-4" />
                   </button>
                 </div>
+
+                {/* Conversion automatique */}
+                {selectedUnit && conversionRate > 1 && (
+                  <div className="mt-2 bg-orange-50 border border-orange-200 rounded-md px-3 py-2">
+                    <p className="text-xs text-orange-700 font-medium">
+                      {formData.quantity} {selectedUnit.unit_name}(s)
+                      = <strong>{quantityInBase} {selectedProduct?.base_unit || 'pcs'}</strong>
+                      {formData.type === 'entree' ? ' seront ajoutés' : ' seront déduits'} du stock
+                    </p>
+                  </div>
+                )}
               </div>
+
+              {/* Motif */}
               <div>
                 <label className="block text-sm font-medium mb-1">Motif</label>
                 <input
@@ -217,12 +321,36 @@ export default function StocksPage() {
                   value={formData.reason}
                   onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
                   className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  placeholder="Ex: Réception commande, Perte, Correction..."
+                  placeholder="Ex: Réception commande, Perte, Correction inventaire..."
                 />
               </div>
+
+              {/* Résumé */}
+              {formData.product_id && selectedProduct && (
+                <div className="bg-slate-50 rounded-md px-3 py-2 text-xs space-y-1">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Stock actuel</span>
+                    <span className="font-medium">{selectedProduct.stock_current} {selectedProduct.base_unit || 'pcs'}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold">
+                    <span>Après mouvement</span>
+                    <span className={formData.type === 'entree' ? 'text-emerald-600' : 'text-red-500'}>
+                      {formData.type === 'entree'
+                        ? selectedProduct.stock_current + quantityInBase
+                        : Math.max(0, selectedProduct.stock_current - quantityInBase)
+                      } {selectedProduct.base_unit || 'pcs'}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
+
             <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowForm(false)}>
+              <Button variant="outline" className="flex-1" onClick={() => {
+                setShowForm(false)
+                setSelectedUnit(null)
+                setConversionRate(1)
+              }}>
                 Annuler
               </Button>
               <Button
