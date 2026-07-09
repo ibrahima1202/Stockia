@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User, Building2, Trash2, Crown, Calendar, ChevronRight, Pencil } from 'lucide-react'
+import { User, Building2, Trash2, Crown, Calendar, ChevronRight, Pencil, Package, ShoppingBag } from 'lucide-react'
 import { Card } from '@/components/ui/index'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/store/authStore'
@@ -25,6 +25,7 @@ export default function ProfilePage() {
   const [businessName, setBusinessName] = useState(business?.name ?? '')
   const [businessPhone, setBusinessPhone] = useState(business?.phone ?? '')
   const [businessCity, setBusinessCity] = useState(business?.city ?? '')
+  const [commerceType, setCommerceType] = useState<'detail' | 'gros_detail'>(business?.commerce_type ?? 'detail')
   const [businessSubmitting, setBusinessSubmitting] = useState(false)
 
   // Nettoyage
@@ -54,6 +55,7 @@ export default function ProfilePage() {
         name: businessName,
         phone: businessPhone,
         city: businessCity,
+        commerce_type: commerceType,
       })
       toast.success('Commerce mis à jour')
       setEditingBusiness(false)
@@ -214,6 +216,7 @@ export default function ProfilePage() {
                   setBusinessName(business.name)
                   setBusinessPhone(business.phone ?? '')
                   setBusinessCity(business.city ?? '')
+                  setCommerceType(business.commerce_type ?? 'detail')
                   setEditingBusiness(true)
                 }}
                 className="p-1.5 hover:bg-emerald-50 rounded text-emerald-500"
@@ -233,9 +236,19 @@ export default function ProfilePage() {
                 <span className="text-xs text-muted-foreground">Téléphone</span>
                 <span className="text-sm">{business.phone || '—'}</span>
               </div>
-              <div className="flex items-center justify-between py-1.5">
+              <div className="flex items-center justify-between py-1.5 border-b">
                 <span className="text-xs text-muted-foreground">Ville</span>
                 <span className="text-sm">{business.city || '—'}</span>
+              </div>
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-xs text-muted-foreground">Type de vente</span>
+                <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                  business.commerce_type === 'gros_detail'
+                    ? 'bg-orange-100 text-orange-600'
+                    : 'bg-blue-100 text-blue-600'
+                }`}>
+                  {business.commerce_type === 'gros_detail' ? '📦 Gros & Détail' : '🛍️ Détail uniquement'}
+                </span>
               </div>
             </div>
           ) : (
@@ -269,6 +282,55 @@ export default function ProfilePage() {
                   placeholder="Kadiolo, Sikasso, Bamako..."
                 />
               </div>
+
+              {/* Type de commerce */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Type de vente</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCommerceType('detail')}
+                    className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-colors ${
+                      commerceType === 'detail'
+                        ? 'border-orange-500 bg-orange-50'
+                        : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <Package className={`h-5 w-5 ${commerceType === 'detail' ? 'text-orange-500' : 'text-slate-400'}`} />
+                    <div className="text-center">
+                      <p className={`text-xs font-semibold ${commerceType === 'detail' ? 'text-orange-600' : 'text-slate-700'}`}>
+                        Vente au détail
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Vente à l'unité</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCommerceType('gros_detail')}
+                    className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-colors ${
+                      commerceType === 'gros_detail'
+                        ? 'border-orange-500 bg-orange-50'
+                        : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <ShoppingBag className={`h-5 w-5 ${commerceType === 'gros_detail' ? 'text-orange-500' : 'text-slate-400'}`} />
+                    <div className="text-center">
+                      <p className={`text-xs font-semibold ${commerceType === 'gros_detail' ? 'text-orange-600' : 'text-slate-700'}`}>
+                        Gros & Détail
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Carton, pack, pièce...</p>
+                    </div>
+                  </button>
+                </div>
+                {commerceType === 'gros_detail' && business.commerce_type === 'detail' && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-md px-3 py-2">
+                    <p className="text-xs text-orange-700">
+                      💡 En passant en mode Gros & Détail, vous pourrez définir des unités (Pack, Carton...) pour chaque produit.
+                    </p>
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => setEditingBusiness(false)}>
                   Annuler
@@ -314,4 +376,4 @@ export default function ProfilePage() {
       </Card>
     </div>
   )
-              }
+}
