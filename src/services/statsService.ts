@@ -73,16 +73,15 @@ export const statsService = {
 
     const sales = (salesRaw ?? []) as unknown as SaleData[]
 
+    // CA = total de TOUTES les ventes (crédit inclus)
+    // car la marchandise est sortie du stock dans tous les cas
     let revenue = 0
     let cost = 0
     const productMap = new Map<string, ProductStat>()
 
     for (const sale of sales) {
-      if (sale.statut === 'paye') {
-        revenue += sale.total_amount
-      } else if (sale.statut === 'partiel') {
-        revenue += sale.montant_paye ?? 0
-      }
+      // Revenue = montant total de la vente (pas seulement encaissé)
+      revenue += sale.total_amount
 
       for (const item of sale.sale_items || []) {
         const product = Array.isArray(item.product)
@@ -103,7 +102,6 @@ export const statsService = {
           existing.cost += itemCost
           existing.profit = existing.revenue - existing.cost
 
-          // Mise à jour affichage quantité
           if (unitNm && convRate > 1) {
             const unitQty = Math.round(existing.quantity_sold / convRate)
             existing.quantity_sold_display = `${unitQty} ${unitNm} (${existing.quantity_sold} pcs)`
@@ -111,7 +109,6 @@ export const statsService = {
             existing.quantity_sold_display = `${existing.quantity_sold} pcs`
           }
         } else {
-          // Calcul affichage quantité
           const quantityDisplay = unitNm && convRate > 1
             ? `${item.quantity} ${unitNm} (${qtyInBase} pcs)`
             : `${qtyInBase} pcs`
@@ -156,6 +153,7 @@ export const statsService = {
   },
 
   async getFondsRoulement(): Promise<FondsRoulement> {
+    // Valeur du stock
     const { data: products, error: pError } = await supabase
       .from('products')
       .select('stock_current, purchase_price')
@@ -166,17 +164,17 @@ export const statsService = {
       (s, p) => s + p.stock_current * p.purchase_price, 0
     )
 
-    const { data: sales, error: sError } = await supabase
-      .from('sales')
-      .select('total_amount, montant_paye, statut')
-    if (sError) throw sError
+    // Caisse = total des débits du journal (ventes encaissées + règlements clients reçus)
+    const { data: journalData, error: jError } = await supabase
+      .from('journal_entries')
+      .select('debit, credit')
+    if (jError) throw jError
 
-    const cashBalance = (sales || []).reduce((s, sale) => {
-      if (sale.statut === 'paye') return s + sale.total_amount
-      if (sale.statut === 'partiel') return s + (sale.montant_paye ?? 0)
-      return s
+    const cashBalance = (journalData || []).reduce((s, entry) => {
+      return s + entry.debit - entry.credit
     }, 0)
 
+    // Créances clients (ce qu'ils doivent encore)
     const { data: clients, error: cError } = await supabase
       .from('clients')
       .select('solde')
@@ -184,6 +182,7 @@ export const statsService = {
 
     const clientsReceivables = (clients || []).reduce((s, c) => s + c.solde, 0)
 
+    // Dettes fournisseurs
     const { data: fournisseurs, error: fError } = await supabase
       .from('fournisseurs')
       .select('solde')
