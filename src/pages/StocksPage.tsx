@@ -286,13 +286,19 @@ export default function StocksPage() {
                     <Minus className="h-4 w-4" />
                   </button>
                   <input
-                    type="number"
-                    min="1"
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
-                    onFocus={(e) => e.target.select()}
-                    className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  />
+  type="number"
+  min="1"
+  step="0.001"
+  value={formData.quantity}
+  onChange={(e) =>
+    setFormData({
+      ...formData,
+      quantity: parseFloat(e.target.value) || 1,
+    })
+  }
+  onFocus={(e) => e.target.select()}
+  className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+/>
                   <button
                     onClick={() => setFormData({ ...formData, quantity: formData.quantity + 1 })}
                     className="h-9 w-9 rounded-md border border-input flex items-center justify-center hover:bg-muted"
