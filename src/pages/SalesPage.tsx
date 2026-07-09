@@ -84,7 +84,7 @@ export default function SalesPage() {
   const [activeTab, setActiveTab] = useState<'list' | 'new'>('list')
   const [selectedProductId, setSelectedProductId] = useState('')
   const [selectedUnit, setSelectedUnit] = useState<ProductUnit | null>(null)
-  const [qty, setQty] = useState(1)
+  const [qty, setQty] = useState<number>(1)
   const [productSearch, setProductSearch] = useState('')
   const [showProductDropdown, setShowProductDropdown] = useState(false)
 
@@ -146,13 +146,13 @@ export default function SalesPage() {
   const addToCart = () => {
     const product = products.find((p) => p.id === selectedProductId)
     if (!product) return
-    if (qty < 1) return
+    if (qty <= 0) return
 
     const conversionRate = selectedUnit?.conversion_rate ?? 1
     const quantityInBase = qty * conversionRate
 
     if (quantityInBase > product.stock_current) {
-      toast.error('Stock insuffisant', `Maximum disponible: ${Math.floor(product.stock_current / conversionRate)} ${selectedUnit?.unit_name ?? product.base_unit ?? 'unité'}(s)`)
+      toast.error('Stock insuffisant', `Maximum disponible: ${(product.stock_current / conversionRate).toFixed(3)} ${selectedUnit?.unit_name ?? product.base_unit ?? 'unité'}(s)`)
       return
     }
 
@@ -542,23 +542,26 @@ export default function SalesPage() {
                   )}
                   {showProductDropdown && <div className="fixed inset-0 z-10" onClick={() => setShowProductDropdown(false)} />}
                 </div>
+
+                {/* Champ quantité avec virgules */}
                 <input
                   type="number"
-                  min="1"
+                  min="0.001"
+                  step="0.001"
                   value={qty === 0 ? '' : qty}
                   onChange={(e) => {
                     const val = e.target.value
                     if (val === '') {
                       setQty(0)
                     } else {
-                      setQty(parseInt(val) || 1)
+                      setQty(parseFloat(val) || 0)
                     }
                   }}
                   onFocus={(e) => e.target.select()}
                   disabled={isReadOnly}
                   className="w-20 h-9 rounded-md border border-input bg-background px-3 text-sm text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
                 />
-                <Button onClick={addToCart} disabled={!selectedProductId || isReadOnly || qty < 1}>
+                <Button onClick={addToCart} disabled={!selectedProductId || isReadOnly || qty <= 0}>
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
@@ -621,11 +624,11 @@ export default function SalesPage() {
                             <TableCell className="text-right text-sm">{formatCurrency(item.unit_price)}</TableCell>
                             <TableCell>
                               <div className="flex items-center justify-center gap-1">
-                                <button onClick={() => updateQty(item.product.id, item.unit_id, item.quantity - 1)} disabled={isReadOnly} className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30">
+                                <button onClick={() => updateQty(item.product.id, item.unit_id, item.quantity - 0.5)} disabled={isReadOnly} className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30">
                                   <Minus className="h-3 w-3" />
                                 </button>
-                                <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                                <button onClick={() => updateQty(item.product.id, item.unit_id, item.quantity + 1)} disabled={isReadOnly} className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30">
+                                <span className="w-10 text-center text-sm font-medium">{item.quantity}</span>
+                                <button onClick={() => updateQty(item.product.id, item.unit_id, item.quantity + 0.5)} disabled={isReadOnly} className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30">
                                   <Plus className="h-3 w-3" />
                                 </button>
                               </div>
@@ -771,4 +774,4 @@ export default function SalesPage() {
       )}
     </div>
   )
-}
+  }
