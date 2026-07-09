@@ -27,18 +27,27 @@ export const saleService = {
 
   async getTodayStats(): Promise<{ revenue: number; count: number }> {
     const today = dateFormat(new Date(), 'yyyy-MM-dd')
-    const { data, error } = await supabase
+
+    // CA du jour = total des débits du journal du jour
+    // (ventes encaissées + règlements clients reçus)
+    const { data: journalData, error: jError } = await supabase
+      .from('journal_entries')
+      .select('debit')
+      .gte('entry_date', today)
+      .lte('entry_date', today)
+    if (jError) throw jError
+
+    const revenue = (journalData || []).reduce((sum, e) => sum + e.debit, 0)
+
+    // Nombre de ventes du jour
+    const { data: salesData, error: sError } = await supabase
       .from('sales')
-      .select('total_amount, montant_paye, statut')
+      .select('id')
       .gte('created_at', `${today}T00:00:00`)
       .lte('created_at', `${today}T23:59:59`)
-    if (error) throw error
-    const revenue = (data || []).reduce((sum, s) => {
-      if (s.statut === 'credit') return sum
-      if (s.statut === 'partiel') return sum + (s.montant_paye ?? 0)
-      return sum + s.total_amount
-    }, 0)
-    return { revenue, count: (data || []).length }
+    if (sError) throw sError
+
+    return { revenue, count: (salesData || []).length }
   },
 
   async create(payload: CreateSalePayload, userId: string): Promise<Sale> {
@@ -93,7 +102,7 @@ export const saleService = {
     const { error: itemsError } = await supabase.from('sale_items').insert(saleItems)
     if (itemsError) throw itemsError
 
-    // 3. Mise à jour stock — utilise quantity_in_base pour les conversions
+    // 3. Mise à jour stock
     for (const item of payload.items) {
       const quantityToDeduct = item.quantity_in_base ?? item.quantity
 
@@ -113,7 +122,6 @@ export const saleService = {
         .eq('id', item.product.id)
       if (stockError) throw stockError
 
-      // Mouvement de stock avec la quantité en unité de base
       const unitLabel = item.unit_name && item.unit_name !== item.product.base_unit
         ? `${item.quantity} ${item.unit_name} (${quantityToDeduct} ${item.product.base_unit || 'pcs'})`
         : `${quantityToDeduct}`
@@ -223,5 +231,19 @@ export const saleService = {
     await supabase.from('reglements_clients').delete().eq('sale_id', id)
     const { error } = await supabase.from('sales').delete().eq('id', id)
     if (error) throw error
+  },
+
+  async updateSale(
+    id: string,
+    updates: Partial<Pick<Sale, 'payment_method' | 'notes'>>
+  ): Promise<Sale> {
+    const { data, error } = await supabase
+      .from('sales')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
   },
 }
