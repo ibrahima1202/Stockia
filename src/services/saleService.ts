@@ -8,7 +8,7 @@ export const saleService = {
   async getAll(limit = 100): Promise<Sale[]> {
     const { data, error } = await supabase
       .from('sales')
-      .select('*, sale_items(*, product:products(name, reference)), profile:profiles(full_name), client:clients(name)')
+      .select('*, sale_items(*, product:products(id, name, reference, selling_price, purchase_price, base_unit)), profile:profiles(full_name), client:clients(name, phone)')
       .order('created_at', { ascending: false })
       .limit(limit)
     if (error) throw error
