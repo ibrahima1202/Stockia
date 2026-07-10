@@ -6,6 +6,11 @@ import { useSubscription } from '@/hooks/useSubscription'
 
 const STEPS = ['Compte', 'Commerce']
 
+const phoneToEmail = (phone: string): string => {
+  const digits = phone.replace(/\D/g, '')
+  return `${digits}@stockam.app`
+}
+
 export default function RegisterPage() {
   const navigate = useNavigate()
   const { plans, createBusiness } = useSubscription()
@@ -16,7 +21,7 @@ export default function RegisterPage() {
 
   // Étape 1 — Compte
   const [fullName, setFullName] = useState('')
-  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -29,8 +34,16 @@ export default function RegisterPage() {
   const [commerceType, setCommerceType] = useState<'detail' | 'gros_detail'>('detail')
 
   const handleStep1 = () => {
-    if (!fullName || !email || !password) {
-      setError('Tous les champs obligatoires doivent être remplis')
+    if (!fullName.trim()) {
+      setError('Le nom complet est obligatoire')
+      return
+    }
+    if (!phone.trim() || phone.replace(/\D/g, '').length < 8) {
+      setError('Veuillez saisir un numéro de téléphone valide')
+      return
+    }
+    if (!password) {
+      setError('Le mot de passe est obligatoire')
       return
     }
     if (password !== confirmPassword) {
@@ -53,11 +66,14 @@ export default function RegisterPage() {
     setError('')
     setIsLoading(true)
     try {
+      // Convertir le numéro en email fictif
+      const email = phoneToEmail(phone)
+
       const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { full_name: fullName, role: 'admin' }
+          data: { full_name: fullName, role: 'admin', phone }
         }
       })
       if (authError) throw authError
@@ -69,7 +85,7 @@ export default function RegisterPage() {
       await createBusiness(
         {
           name: businessName,
-          phone: businessPhone,
+          phone: businessPhone || phone,
           city: businessCity,
           commerce_type: commerceType,
         },
@@ -85,7 +101,7 @@ export default function RegisterPage() {
         msg.toLowerCase().includes('user already') ||
         msg.toLowerCase().includes('email')
       ) {
-        setError('Un compte existe déjà avec cet email. Connectez-vous ou réinitialisez votre mot de passe.')
+        setError('Un compte existe déjà avec ce numéro. Connectez-vous ou contactez le support.')
         setStep(0)
       } else {
         setError(msg)
@@ -166,16 +182,25 @@ export default function RegisterPage() {
                     />
                   </div>
                 </div>
+
+                {/* Numéro de téléphone */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">Email *</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    placeholder="vous@example.com"
-                  />
+                  <label className="block text-sm font-medium mb-1">Numéro de téléphone *</label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full h-9 rounded-md border border-input bg-background pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="Ex: 79740816"
+                    />
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Ce numéro sera utilisé pour vous connecter
+                  </p>
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium mb-1">Mot de passe *</label>
                   <div className="relative">
@@ -195,6 +220,7 @@ export default function RegisterPage() {
                     </button>
                   </div>
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium mb-1">Confirmer le mot de passe *</label>
                   <div className="relative">
@@ -225,9 +251,14 @@ export default function RegisterPage() {
                         Se connecter →
                       </Link>
                       <span className="text-slate-300">|</span>
-                      <Link to="/login" className="text-sm text-slate-500 hover:underline">
-                        Mot de passe oublié ?
-                      </Link>
+                      <a
+                        href="https://wa.me/22392347783?text=Bonjour, j'ai oublié mon mot de passe STOCKAM."
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm text-green-600 hover:underline"
+                      >
+                        Contacter le support
+                      </a>
                     </div>
                   )}
                 </div>
@@ -312,7 +343,7 @@ export default function RegisterPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Téléphone</label>
+                  <label className="block text-sm font-medium mb-1">Téléphone du commerce</label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                     <input
@@ -379,4 +410,4 @@ export default function RegisterPage() {
       </p>
     </div>
   )
-}
+                                                             }
