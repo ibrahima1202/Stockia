@@ -69,7 +69,7 @@ export function AppLayout() {
             <p className="text-white font-bold text-sm leading-tight">
               STOCK<span className="text-orange-500">AM</span>
             </p>
-            <p className="text-slate-400 text-[10px] leading-tight">Gestion de stock</p>
+            <p className="text-slate-400 text-[10px] leading-tight">Gestion de Commerce Simplifiée</p>
           </div>
         </div>
 
