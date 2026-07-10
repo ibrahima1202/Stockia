@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookOpen, FileDown, Lock } from 'lucide-react'
+import { BookOpen, FileDown, Lock, Plus } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   Badge, EmptyState, Card
@@ -11,11 +11,17 @@ import { useRole } from '@/hooks/useRole'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { pdfService } from '@/services/pdfService'
+import { supabase } from '@/lib/supabase'
+import { getBusinessId } from '@/lib/business'
+import { generateReference } from '@/lib/utils'
 
 const sourceLabels: Record<string, { label: string; variant: 'success' | 'danger' | 'info' }> = {
   vente: { label: 'Vente', variant: 'success' },
   depense: { label: 'Dépense', variant: 'danger' },
   manuel: { label: 'Manuel', variant: 'info' },
+  reglement_client: { label: 'Règlement', variant: 'success' },
+  achat_fournisseur: { label: 'Achat', variant: 'danger' },
+  reglement_fournisseur: { label: 'Fournisseur', variant: 'danger' },
 }
 
 export default function JournalPage() {
@@ -25,6 +31,14 @@ export default function JournalPage() {
   const { entries, isLoading, reload } = useJournal()
   const { canExportPDF, business } = useSubscription()
   const { canViewJournal, canExportPDFRole } = useRole()
+
+  // Modal entrée manuelle
+  const [showManual, setShowManual] = useState(false)
+  const [manualLabel, setManualLabel] = useState('')
+  const [manualAmount, setManualAmount] = useState('')
+  const [manualType, setManualType] = useState<'debit' | 'credit'>('debit')
+  const [manualDate, setManualDate] = useState(format(today, 'yyyy-MM-dd'))
+  const [manualSubmitting, setManualSubmitting] = useState(false)
 
   const totalDebit = entries.reduce((s, e) => s + e.debit, 0)
   const totalCredit = entries.reduce((s, e) => s + e.credit, 0)
@@ -37,11 +51,40 @@ export default function JournalPage() {
     pdfService.exportJournal(entries, business?.name ?? 'Mon Commerce', period)
   }
 
+  const handleManualEntry = async () => {
+    if (!manualLabel.trim() || !manualAmount || parseFloat(manualAmount) <= 0) return
+    setManualSubmitting(true)
+    try {
+      const reference = generateReference('MAN')
+      const businessId = getBusinessId()
+      const amount = parseFloat(manualAmount)
+
+      await supabase.from('journal_entries').insert({
+        entry_date: manualDate,
+        reference,
+        label: manualLabel.trim(),
+        debit: manualType === 'debit' ? amount : 0,
+        credit: manualType === 'credit' ? amount : 0,
+        source_type: 'manuel',
+        business_id: businessId,
+      })
+
+      setShowManual(false)
+      setManualLabel('')
+      setManualAmount('')
+      setManualType('debit')
+      setManualDate(format(today, 'yyyy-MM-dd'))
+      reload(dateFrom, dateTo)
+    } catch {
+    } finally {
+      setManualSubmitting(false)
+    }
+  }
+
   const canExport = canExportPDF && canExportPDFRole
 
   if (isLoading) return <LoadingScreen text="Chargement du journal..." />
 
-  // Blocage par rôle
   if (!canViewJournal) {
     return (
       <div className="flex flex-col items-center justify-center py-16 space-y-4 text-center">
@@ -65,20 +108,26 @@ export default function JournalPage() {
           <h1 className="page-title">Livre Journal</h1>
           <p className="text-sm text-muted-foreground">{entries.length} écriture(s)</p>
         </div>
-        {canExport ? (
-          <Button onClick={handleExportPDF} disabled={entries.length === 0}>
-            <FileDown className="h-4 w-4" />
-            <span className="hidden sm:inline">Exporter PDF</span>
-            <span className="sm:hidden">PDF</span>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setShowManual(true)} variant="outline">
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Entrée manuelle</span>
           </Button>
-        ) : (
-          <button
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-dashed border-slate-300 text-slate-400 text-sm cursor-not-allowed"
-            title="Fonctionnalité Pro"
-          >
-            <Lock className="h-3.5 w-3.5" /> PDF (Pro)
-          </button>
-        )}
+          {canExport ? (
+            <Button onClick={handleExportPDF} disabled={entries.length === 0}>
+              <FileDown className="h-4 w-4" />
+              <span className="hidden sm:inline">Exporter PDF</span>
+              <span className="sm:hidden">PDF</span>
+            </Button>
+          ) : (
+            <button
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-dashed border-slate-300 text-slate-400 text-sm cursor-not-allowed"
+              title="Fonctionnalité Pro"
+            >
+              <Lock className="h-3.5 w-3.5" /> PDF (Pro)
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -193,6 +242,118 @@ export default function JournalPage() {
           </Table>
         )}
       </div>
+
+      {/* Modal entrée manuelle */}
+      {showManual && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+            <h2 className="font-semibold text-lg">Entrée manuelle</h2>
+            <p className="text-sm text-muted-foreground">
+              Utilisez cette option pour enregistrer un solde d'ouverture, une recette ou une sortie hors vente.
+            </p>
+
+            <div className="space-y-3">
+              {/* Type */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Type *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setManualType('debit')}
+                    className={`py-2.5 rounded-lg text-sm font-semibold border-2 transition-colors ${
+                      manualType === 'debit'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                        : 'border-slate-200 text-slate-600'
+                    }`}
+                  >
+                    ↑ Entrée caisse
+                  </button>
+                  <button
+                    onClick={() => setManualType('credit')}
+                    className={`py-2.5 rounded-lg text-sm font-semibold border-2 transition-colors ${
+                      manualType === 'credit'
+                        ? 'border-red-500 bg-red-50 text-red-700'
+                        : 'border-slate-200 text-slate-600'
+                    }`}
+                  >
+                    ↓ Sortie caisse
+                  </button>
+                </div>
+              </div>
+
+              {/* Libellé */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Libellé *</label>
+                <input
+                  type="text"
+                  value={manualLabel}
+                  onChange={(e) => setManualLabel(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  placeholder="Ex: Solde d'ouverture, Recette marché..."
+                  autoFocus
+                />
+              </div>
+
+              {/* Montant */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Montant (XOF) *</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={manualAmount}
+                  onChange={(e) => setManualAmount(e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  placeholder="0"
+                />
+              </div>
+
+              {/* Date */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Date *</label>
+                <input
+                  type="date"
+                  value={manualDate}
+                  onChange={(e) => setManualDate(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+
+              {/* Résumé */}
+              {manualAmount && parseFloat(manualAmount) > 0 && (
+                <div className={`rounded-md px-3 py-2 text-sm font-medium ${
+                  manualType === 'debit'
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-red-50 text-red-700'
+                }`}>
+                  {manualType === 'debit' ? '↑ Entrée' : '↓ Sortie'} de{' '}
+                  <strong>{formatCurrency(parseFloat(manualAmount))} XOF</strong>
+                  {manualLabel ? ` — ${manualLabel}` : ''}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => {
+                setShowManual(false)
+                setManualLabel('')
+                setManualAmount('')
+                setManualType('debit')
+                setManualDate(format(today, 'yyyy-MM-dd'))
+              }}>
+                Annuler
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleManualEntry}
+                isLoading={manualSubmitting}
+                disabled={!manualLabel.trim() || !manualAmount || parseFloat(manualAmount) <= 0}
+              >
+                Enregistrer
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
-}
+              }
