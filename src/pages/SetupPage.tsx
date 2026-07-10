@@ -61,7 +61,7 @@ export default function SetupPage() {
           <p className="text-white font-bold text-xl leading-tight">
             STOCK<span className="text-orange-500">AM</span>
           </p>
-          <p className="text-slate-400 text-xs">Gestion de stock intelligente</p>
+          <p className="text-slate-400 text-xs">Gestion de Commerce Simplifiée</p>
         </div>
       </div>
 
