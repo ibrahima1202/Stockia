@@ -11,7 +11,7 @@ export default async (request: Request) => {
       currency: 'XOF',
       ref_command: subscriptionId,
       command_name: `Abonnement STOCKAM ${planName}`,
-      env: 'prod',
+      env: 'test',
       ipn_url: `${process.env.URL}/.netlify/functions/paytech-webhook`,
       success_url: `${process.env.URL}/payment-success`,
       cancel_url: `${process.env.URL}/subscription`,
