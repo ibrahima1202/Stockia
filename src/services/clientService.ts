@@ -143,9 +143,14 @@ export const clientService = {
     }
 
     // Trier par date décroissante
-    entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    return entries
-  },
+      entries.sort((a, b) => {
+    const dateA = new Date(a.date).getTime()
+    const dateB = new Date(b.date).getTime()
+    if (dateB !== dateA) return dateB - dateA
+    // Si même date, priorité aux règlements sur les ventes
+    const order = { reglement: 0, pret: 1, vente: 2 }
+    return order[a.type] - order[b.type]
+  })
 
   async addReglement(
     clientId: string,
