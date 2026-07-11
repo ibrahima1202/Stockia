@@ -1,10 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ShoppingCart, Wallet, Banknote, User } from 'lucide-react'
+import { ArrowLeft, ShoppingCart, Wallet, Banknote, User, Plus } from 'lucide-react'
 import { LoadingScreen, Card, Badge } from '@/components/ui/index'
+import { Button } from '@/components/ui/button'
+import { Select } from '@/components/ui/select'
 import { clientService, type ClientHistoriqueEntry } from '@/services/clientService'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import type { Client } from '@/types'
+import { supabase } from '@/lib/supabase'
+import { getBusinessId } from '@/lib/business'
+import { generateReference } from '@/lib/utils'
+import { format } from 'date-fns'
+import { useToast } from '@/store/toastStore'
+import type { Client, PaymentMethod } from '@/types'
 
 const typeConfig = {
   vente: {
@@ -13,7 +20,6 @@ const typeConfig = {
     color: 'text-red-500',
     bg: 'bg-red-50',
     badge: 'danger' as const,
-    sign: '+',
   },
   reglement: {
     label: 'Règlement',
@@ -21,7 +27,6 @@ const typeConfig = {
     color: 'text-emerald-500',
     bg: 'bg-emerald-50',
     badge: 'success' as const,
-    sign: '-',
   },
   pret: {
     label: 'Prêt espèces',
@@ -29,36 +34,125 @@ const typeConfig = {
     color: 'text-purple-500',
     bg: 'bg-purple-50',
     badge: 'info' as const,
-    sign: '+',
   },
 }
 
 export default function ClientHistoriquePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const toast = useToast()
 
   const [client, setClient] = useState<Client | null>(null)
   const [historique, setHistorique] = useState<ClientHistoriqueEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
+  // Règlement
+  const [showReglement, setShowReglement] = useState(false)
+  const [reglementMontant, setReglementMontant] = useState('')
+  const [reglementMethod, setReglementMethod] = useState<PaymentMethod>('especes')
+  const [reglementNotes, setReglementNotes] = useState('')
+  const [reglementSubmitting, setReglementSubmitting] = useState(false)
+
+  // Prêt
+  const [showPret, setShowPret] = useState(false)
+  const [pretMontant, setPretMontant] = useState('')
+  const [pretNotes, setPretNotes] = useState('')
+  const [pretSubmitting, setPretSubmitting] = useState(false)
+
+  const load = async () => {
     if (!id) return
-    const load = async () => {
-      setIsLoading(true)
-      try {
-        const [c, h] = await Promise.all([
-          clientService.getById(id),
-          clientService.getHistorique(id),
-        ])
-        setClient(c)
-        setHistorique(h)
-      } catch {
-      } finally {
-        setIsLoading(false)
-      }
+    setIsLoading(true)
+    try {
+      const [c, h] = await Promise.all([
+        clientService.getById(id),
+        clientService.getHistorique(id),
+      ])
+      setClient(c)
+      setHistorique(h)
+    } catch {
+    } finally {
+      setIsLoading(false)
     }
-    load()
-  }, [id])
+  }
+
+  useEffect(() => { load() }, [id])
+
+  const handleReglement = async () => {
+    if (!client || !reglementMontant || parseFloat(reglementMontant) <= 0) return
+    setReglementSubmitting(true)
+    try {
+      const { user } = (await supabase.auth.getUser()).data
+      await clientService.addReglement(
+        client.id,
+        parseFloat(reglementMontant),
+        reglementMethod,
+        reglementNotes,
+        null,
+        user?.id ?? ''
+      )
+      toast.success('Règlement enregistré', `${formatCurrency(parseFloat(reglementMontant))} XOF reçu`)
+      setShowReglement(false)
+      setReglementMontant('')
+      setReglementNotes('')
+      await load()
+    } catch {
+      toast.error('Erreur', 'Impossible d\'enregistrer le règlement')
+    } finally {
+      setReglementSubmitting(false)
+    }
+  }
+
+  const handlePret = async () => {
+    if (!client || !pretMontant || parseFloat(pretMontant) <= 0) return
+    setPretSubmitting(true)
+    try {
+      const businessId = getBusinessId()
+      const montant = parseFloat(pretMontant)
+      const reference = generateReference('PRE')
+      const today = format(new Date(), 'yyyy-MM-dd')
+
+      const { error: clientError } = await supabase
+        .from('clients')
+        .update({ solde: client.solde + montant })
+        .eq('id', client.id)
+      if (clientError) throw clientError
+
+      const { error: journalError } = await supabase
+        .from('journal_entries')
+        .insert({
+          entry_date: today,
+          reference,
+          label: `Prêt espèces — ${client.name}${pretNotes ? ` (${pretNotes})` : ''}`,
+          debit: 0,
+          credit: montant,
+          source_type: 'manuel',
+          business_id: businessId,
+        })
+      if (journalError) throw journalError
+
+      const { error: rError } = await supabase
+        .from('reglements_clients')
+        .insert({
+          client_id: client.id,
+          montant: -montant,
+          payment_method: 'especes',
+          notes: `Prêt espèces — ${reference}${pretNotes ? ` — ${pretNotes}` : ''}`,
+          reglement_date: today,
+          business_id: businessId,
+        })
+      if (rError) throw rError
+
+      toast.success('Prêt enregistré', `${formatCurrency(montant)} XOF prêté à ${client.name}`)
+      setShowPret(false)
+      setPretMontant('')
+      setPretNotes('')
+      await load()
+    } catch {
+      toast.error('Erreur', 'Impossible d\'enregistrer le prêt')
+    } finally {
+      setPretSubmitting(false)
+    }
+  }
 
   if (isLoading) return <LoadingScreen text="Chargement de l'historique..." />
 
@@ -89,14 +183,34 @@ export default function ClientHistoriquePage() {
           <ArrowLeft className="h-4 w-4" /> Retour aux clients
         </button>
 
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-            <User className="h-6 w-6 text-orange-500" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+              <User className="h-6 w-6 text-orange-500" />
+            </div>
+            <div>
+              <h1 className="page-title">{client.name}</h1>
+              {client.phone && (
+                <p className="text-sm text-muted-foreground">{client.phone}</p>
+              )}
+            </div>
           </div>
-          <div>
-            <h1 className="page-title">{client.name}</h1>
-            {client.phone && (
-              <p className="text-sm text-muted-foreground">{client.phone}</p>
+
+          {/* Boutons actions */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowPret(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple-50 text-purple-600 text-xs font-semibold hover:bg-purple-100 transition-colors"
+            >
+              <Banknote className="h-3.5 w-3.5" /> Prêt
+            </button>
+            {client.solde > 0 && (
+              <button
+                onClick={() => setShowReglement(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 text-emerald-600 text-xs font-semibold hover:bg-emerald-100 transition-colors"
+              >
+                <Wallet className="h-3.5 w-3.5" /> Règlement
+              </button>
             )}
           </div>
         </div>
@@ -131,6 +245,14 @@ export default function ClientHistoriquePage() {
         {historique.length === 0 ? (
           <Card className="p-8 text-center">
             <p className="text-muted-foreground text-sm">Aucune opération enregistrée</p>
+            <div className="flex gap-2 justify-center mt-4">
+              <button
+                onClick={() => setShowPret(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple-50 text-purple-600 text-xs font-semibold"
+              >
+                <Plus className="h-3.5 w-3.5" /> Prêt espèces
+              </button>
+            </div>
           </Card>
         ) : (
           <div className="space-y-2">
@@ -155,7 +277,7 @@ export default function ClientHistoriquePage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 mt-1">
-                        <Badge variant={config.badge} >{config.label}</Badge>
+                        <Badge variant={config.badge}>{config.label}</Badge>
                         <span className="text-xs text-muted-foreground">
                           {formatDate(entry.date)}
                         </span>
@@ -178,6 +300,141 @@ export default function ClientHistoriquePage() {
           </div>
         )}
       </div>
+
+      {/* Modal règlement */}
+      {showReglement && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
+                <Wallet className="h-5 w-5 text-emerald-500" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-lg">Règlement client</h2>
+                <p className="text-xs text-muted-foreground">
+                  {client.name} — Solde dû : <span className="text-red-500 font-semibold">{formatCurrency(client.solde)}</span>
+                </p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Montant reçu (XOF) *</label>
+                <input
+                  type="number"
+                  value={reglementMontant}
+                  onChange={(e) => setReglementMontant(e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  placeholder="0"
+                  autoFocus
+                />
+              </div>
+              <Select
+                label="Mode de paiement"
+                value={reglementMethod}
+                onChange={(e) => setReglementMethod(e.target.value as PaymentMethod)}
+                options={[
+                  { value: 'especes', label: 'Espèces' },
+                  { value: 'mobile_money', label: 'Mobile Money' },
+                  { value: 'carte', label: 'Carte bancaire' },
+                ]}
+              />
+              <div>
+                <label className="block text-sm font-medium mb-1">Notes</label>
+                <textarea
+                  value={reglementNotes}
+                  onChange={(e) => setReglementNotes(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => { setShowReglement(false); setReglementMontant(''); setReglementNotes('') }}>
+                Annuler
+              </Button>
+              <Button className="flex-1" onClick={handleReglement} isLoading={reglementSubmitting} disabled={!reglementMontant}>
+                Enregistrer
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal prêt */}
+      {showPret && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                <Banknote className="h-5 w-5 text-purple-500" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-lg">Prêt espèces</h2>
+                <p className="text-xs text-muted-foreground">{client.name}</p>
+              </div>
+            </div>
+
+            <div className="bg-purple-50 border border-purple-200 rounded-md px-3 py-2">
+              <p className="text-xs text-purple-700">
+                💡 Le montant prêté sera déduit de votre caisse et ajouté au solde dû du client.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Montant prêté (XOF) *</label>
+                <input
+                  type="number"
+                  value={pretMontant}
+                  onChange={(e) => setPretMontant(e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  placeholder="0"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Notes</label>
+                <textarea
+                  value={pretNotes}
+                  onChange={(e) => setPretNotes(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  placeholder="Motif du prêt..."
+                />
+              </div>
+
+              {pretMontant && parseFloat(pretMontant) > 0 && (
+                <div className="bg-slate-50 rounded-md px-3 py-2 space-y-1 text-xs">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Solde actuel</span>
+                    <span className="font-medium text-red-500">{formatCurrency(client.solde)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Après prêt</span>
+                    <span className="font-medium text-red-500">{formatCurrency(client.solde + parseFloat(pretMontant))}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => { setShowPret(false); setPretMontant(''); setPretNotes('') }}>
+                Annuler
+              </Button>
+              <Button
+                className="flex-1 bg-purple-500 hover:bg-purple-600"
+                onClick={handlePret}
+                isLoading={pretSubmitting}
+                disabled={!pretMontant || parseFloat(pretMontant) <= 0}
+              >
+                <Banknote className="h-4 w-4" /> Enregistrer
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
