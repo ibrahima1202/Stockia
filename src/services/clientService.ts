@@ -143,14 +143,13 @@ export const clientService = {
     }
 
     // Trier par date décroissante
-      entries.sort((a, b) => {
-    const dateA = new Date(a.date).getTime()
-    const dateB = new Date(b.date).getTime()
-    if (dateB !== dateA) return dateB - dateA
-    // Si même date, priorité aux règlements sur les ventes
-    const order = { reglement: 0, pret: 1, vente: 2 }
-    return order[a.type] - order[b.type]
-  })
+     entries.sort((a, b) => {
+  const dateA = new Date(a.date).getTime()
+  const dateB = new Date(b.date).getTime()
+  if (dateB !== dateA) return dateB - dateA
+  const order: Record<string, number> = { reglement: 0, pret: 1, vente: 2 }
+  return (order[a.type] ?? 0) - (order[b.type] ?? 0)
+})
 
   async addReglement(
     clientId: string,
