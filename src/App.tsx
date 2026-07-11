@@ -18,7 +18,7 @@ import StatsPage from '@/pages/StatsPage'
 import TeamPage from '@/pages/TeamPage'
 import AdminPage from '@/pages/AdminPage'
 import SetupPage from '@/pages/SetupPage'
-
+import ClientHistoriquePage from '@/pages/ClientHistoriquePage'
 export default function App() {
   return (
     <BrowserRouter>
