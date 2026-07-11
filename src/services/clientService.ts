@@ -92,9 +92,7 @@ export const clientService = {
         .map((i: any) => i.product?.name)
         .filter(Boolean)
         .join(', ')
-
       const montantDu = sale.total_amount - (sale.montant_paye ?? 0)
-
       entries.push({
         id: sale.id,
         date: sale.created_at,
@@ -125,9 +123,7 @@ export const clientService = {
       })
     }
 
-    // 3. Prêts (entrées journal avec credit > 0 et label contenant le client)
-
-    // Alternative — chercher dans journal par label
+    // 3. Prêts
     const { data: pretsAlt } = await supabase
       .from('reglements_clients')
       .select('*')
@@ -148,7 +144,6 @@ export const clientService = {
 
     // Trier par date décroissante
     entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-
     return entries
   },
 
@@ -162,6 +157,7 @@ export const clientService = {
   ): Promise<ReglementClient> {
     const businessId = getBusinessId()
 
+    // 1. Enregistrer le règlement
     const { data: reglement, error: rError } = await supabase
       .from('reglements_clients')
       .insert({
@@ -178,24 +174,27 @@ export const clientService = {
       .single()
     if (rError) throw rError
 
-    const { data: client, error: cError } = await supabase
+    // 2. Récupérer le client pour son nom et son solde
+    const { data: clientData, error: cError } = await supabase
       .from('clients')
-      .select('solde')
+      .select('name, solde')
       .eq('id', clientId)
       .single()
     if (cError) throw cError
 
+    // 3. Mettre à jour le solde
     const { error: uError } = await supabase
       .from('clients')
-      .update({ solde: Math.max(0, client.solde - montant) })
+      .update({ solde: Math.max(0, clientData.solde - montant) })
       .eq('id', clientId)
     if (uError) throw uError
 
+    // 4. Entrée journal avec le nom du client
     const reference = generateReference('RCL')
     const { error: jError } = await supabase.from('journal_entries').insert({
       entry_date: new Date().toISOString().split('T')[0],
       reference,
-      label: `Règlement client`,
+      label: `Règlement — ${clientData.name}${notes ? ` (${notes})` : ''}`,
       debit: montant,
       credit: 0,
       source_type: 'reglement_client',
