@@ -126,11 +126,6 @@ export const clientService = {
     }
 
     // 3. Prêts (entrées journal avec credit > 0 et label contenant le client)
-    const { data: prets } = await supabase
-      .from('journal_entries')
-      .select('*')
-      .like('label', `%Prêt espèces%${clientId}%`)
-      .order('entry_date', { ascending: false })
 
     // Alternative — chercher dans journal par label
     const { data: pretsAlt } = await supabase
