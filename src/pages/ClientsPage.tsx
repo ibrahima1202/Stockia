@@ -249,7 +249,12 @@ export default function ClientsPage() {
               {clients.map((client) => (
                 <TableRow key={client.id}>
                   <TableCell>
-                    <p className="font-medium text-sm">{client.name}</p>
+                   <button
+                      onClick={() => navigate(`/clients/${client.id}/historique`)}
+                      className="font-medium text-sm text-orange-500 hover:underline text-left"
+                    >
+                      {client.name}
+                    </button>
                     {client.address && (
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <MapPin className="h-3 w-3" />{client.address}
