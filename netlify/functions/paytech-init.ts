@@ -2,7 +2,6 @@ export default async (request: Request) => {
   if (request.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 })
   }
-
   try {
     const { amount, planName, subscriptionId, userId } = await request.json()
 
@@ -19,17 +18,22 @@ export default async (request: Request) => {
       custom_field: JSON.stringify({ userId, subscriptionId }),
     }
 
+    console.log('Params envoyés à Paytech:', JSON.stringify(params))
+    console.log('API_KEY présente:', !!process.env.PAYTECH_API_KEY)
+    console.log('API_SECRET présente:', !!process.env.PAYTECH_API_SECRET)
+
     const response = await fetch('https://paytech.sn/api/payment/request-payment', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'API-KEY': process.env.PAYTECH_API_KEY!,
-        'API-SECRET': process.env.PAYTECH_API_SECRET!,
+        'API-KEY': process.env.PAYTECH_API_KEY ?? '',
+        'API-SECRET': process.env.PAYTECH_API_SECRET ?? '',
       },
       body: JSON.stringify(params),
     })
 
     const data = await response.json()
+    console.log('Réponse Paytech:', JSON.stringify(data))
 
     if (data.success === 1) {
       return new Response(JSON.stringify({ redirect_url: data.redirect_url }), {
@@ -37,9 +41,10 @@ export default async (request: Request) => {
         headers: { 'Content-Type': 'application/json' },
       })
     } else {
-      return new Response(JSON.stringify({ error: 'Erreur Paytech' }), { status: 400 })
+      return new Response(JSON.stringify({ error: 'Erreur Paytech', details: data }), { status: 400 })
     }
   } catch (error) {
-    return new Response(JSON.stringify({ error: 'Erreur serveur' }), { status: 500 })
+    console.log('Erreur:', error)
+    return new Response(JSON.stringify({ error: 'Erreur serveur', details: String(error) }), { status: 500 })
   }
 }
