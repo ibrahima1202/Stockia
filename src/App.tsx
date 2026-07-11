@@ -51,6 +51,7 @@ export default function App() {
           <Route path="stats" element={<StatsPage />} />
           <Route path="team" element={<TeamPage />} />
           <Route path="expenses" element={<ExpensesPage />} />
+          <Route path="clients/:id/historique" element={<ClientHistoriquePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
