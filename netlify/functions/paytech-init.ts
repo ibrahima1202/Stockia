@@ -43,5 +43,3 @@ export default async (request: Request) => {
     return new Response(JSON.stringify({ error: 'Erreur serveur' }), { status: 500 })
   }
 }
-
-export const config = { path: '/api/paytech-init' }
