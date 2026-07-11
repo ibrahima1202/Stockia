@@ -9,6 +9,7 @@ import { Select } from '@/components/ui/select'
 import { useClients } from '@/hooks/useClients'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useRole } from '@/hooks/useRole'
+import { useToast } from '@/store/toastStore'
 import { formatCurrency } from '@/lib/utils'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -22,6 +23,7 @@ export default function ClientsPage() {
   const { canAccessClientsAndFournisseurs, isLoading: subLoading } = useSubscription()
   const { canViewClients, canManageClients } = useRole()
   const navigate = useNavigate()
+  const toast = useToast()
 
   const [showForm, setShowForm] = useState(false)
   const [editingClient, setEditingClient] = useState<Client | null>(null)
@@ -128,24 +130,14 @@ export default function ClientsPage() {
         })
       if (journalError) throw journalError
 
-      // 3. Enregistrer dans reglements_clients comme prêt
-      const { error: rError } = await supabase
-        .from('reglements_clients')
-        .insert({
-          client_id: pretClient.id,
-          montant: -montant, // négatif = prêt
-          payment_method: 'especes',
-          notes: `Prêt espèces — ${reference}${pretNotes ? ` — ${pretNotes}` : ''}`,
-          reglement_date: today,
-          business_id: businessId,
-        })
-      if (rError) throw rError
-
+      // 3. Fermer le modal et recharger
+      toast.success('Prêt enregistré', `${formatCurrency(montant)} XOF prêté à ${pretClient.name}`)
       setPretClient(null)
       setPretMontant('')
       setPretNotes('')
       reload()
-    } catch {
+    } catch (err) {
+      toast.error('Erreur', err instanceof Error ? err.message : 'Impossible d\'enregistrer le prêt')
     } finally {
       setPretSubmitting(false)
     }
@@ -283,7 +275,6 @@ export default function ClientsPage() {
                   {canManageClients && (
                     <TableCell>
                       <div className="flex items-center gap-1 justify-end">
-                        {/* Bouton prêt espèces */}
                         <button
                           onClick={() => setPretClient(client)}
                           className="p-1.5 hover:bg-purple-50 rounded text-purple-500"
@@ -291,7 +282,6 @@ export default function ClientsPage() {
                         >
                           <Banknote className="h-3.5 w-3.5" />
                         </button>
-                        {/* Bouton règlement */}
                         {client.solde > 0 && (
                           <button
                             onClick={() => setReglementClient(client)}
