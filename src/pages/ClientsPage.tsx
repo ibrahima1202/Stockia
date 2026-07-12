@@ -130,8 +130,21 @@ export default function ClientsPage() {
         })
       if (journalError) throw journalError
 
-      // 3. Fermer le modal et recharger
-      toast.success('Prêt enregistré', `${formatCurrency(montant)} XOF prêté à ${pretClient.name}`)
+      // 3. Enregistrer dans reglements_clients
+const { error: rError } = await supabase
+  .from('reglements_clients')
+  .insert({
+    client_id: pretClient.id,
+    montant: -montant,
+    payment_method: 'especes',
+    notes: `Prêt espèces — ${reference}${pretNotes ? ` — ${pretNotes}` : ''}`,
+    reglement_date: today,
+    business_id: businessId,
+  })
+if (rError) throw rError
+
+// 4. Fermer le modal et recharger
+toast.success('Prêt enregistré', `${formatCurrency(montant)} XOF prêté à ${pretClient.name}`)
       setPretClient(null)
       setPretMontant('')
       setPretNotes('')
