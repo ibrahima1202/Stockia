@@ -53,8 +53,8 @@ export default function ClientHistoriquePage() {
   const [reglementNotes, setReglementNotes] = useState('')
   const [reglementSubmitting, setReglementSubmitting] = useState(false)
 
-  // Prêt
-  const [showPret, setShowPret] = useState(false)
+  // Prêt — utilise pretClient comme dans ClientsPage
+  const [pretClient, setPretClient] = useState<Client | null>(null)
   const [pretMontant, setPretMontant] = useState('')
   const [pretNotes, setPretNotes] = useState('')
   const [pretSubmitting, setPretSubmitting] = useState(false)
@@ -97,11 +97,9 @@ export default function ClientHistoriquePage() {
         null,
         user?.id ?? ''
       )
-      // Fermer d'abord
       setShowReglement(false)
       setReglementMontant('')
       setReglementNotes('')
-      // Mettre à jour localement
       setClient((prev) => prev ? { ...prev, solde: Math.max(0, prev.solde - montant) } : prev)
       toast.success('Règlement enregistré', `${formatCurrency(montant)} XOF reçu`)
       loadHistorique()
@@ -113,7 +111,7 @@ export default function ClientHistoriquePage() {
   }
 
   const handlePret = async () => {
-    if (!client || !pretMontant || parseFloat(pretMontant) <= 0) return
+    if (!pretClient || !pretMontant || parseFloat(pretMontant) <= 0) return
     setPretSubmitting(true)
     try {
       const businessId = getBusinessId()
@@ -123,8 +121,8 @@ export default function ClientHistoriquePage() {
 
       const { error: clientError } = await supabase
         .from('clients')
-        .update({ solde: client.solde + montant })
-        .eq('id', client.id)
+        .update({ solde: pretClient.solde + montant })
+        .eq('id', pretClient.id)
       if (clientError) throw clientError
 
       const { error: journalError } = await supabase
@@ -132,7 +130,7 @@ export default function ClientHistoriquePage() {
         .insert({
           entry_date: today,
           reference,
-          label: `Prêt espèces — ${client.name}${pretNotes ? ` (${pretNotes})` : ''}`,
+          label: `Prêt espèces — ${pretClient.name}${pretNotes ? ` (${pretNotes})` : ''}`,
           debit: 0,
           credit: montant,
           source_type: 'manuel',
@@ -143,7 +141,7 @@ export default function ClientHistoriquePage() {
       const { error: rError } = await supabase
         .from('reglements_clients')
         .insert({
-          client_id: client.id,
+          client_id: pretClient.id,
           montant: -montant,
           payment_method: 'especes',
           notes: `Prêt espèces — ${reference}${pretNotes ? ` — ${pretNotes}` : ''}`,
@@ -152,13 +150,13 @@ export default function ClientHistoriquePage() {
         })
       if (rError) throw rError
 
-      // Fermer d'abord
-      setShowPret(false)
+      // Fermer le modal
+      setPretClient(null)
       setPretMontant('')
       setPretNotes('')
       // Mettre à jour localement
       setClient((prev) => prev ? { ...prev, solde: prev.solde + montant } : prev)
-      toast.success('Prêt enregistré', `${formatCurrency(montant)} XOF prêté à ${client.name}`)
+      toast.success('Prêt enregistré', `${formatCurrency(montant)} XOF prêté à ${pretClient.name}`)
       loadHistorique()
     } catch {
       toast.error('Erreur', 'Impossible d\'enregistrer le prêt')
@@ -211,7 +209,7 @@ export default function ClientHistoriquePage() {
 
           <div className="flex gap-2">
             <button
-              onClick={() => setShowPret(true)}
+              onClick={() => setPretClient(client)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple-50 text-purple-600 text-xs font-semibold hover:bg-purple-100 transition-colors"
             >
               <Banknote className="h-3.5 w-3.5" /> Prêt
@@ -257,7 +255,7 @@ export default function ClientHistoriquePage() {
             <p className="text-muted-foreground text-sm">Aucune opération enregistrée</p>
             <div className="flex gap-2 justify-center mt-4">
               <button
-                onClick={() => setShowPret(true)}
+                onClick={() => setPretClient(client)}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple-50 text-purple-600 text-xs font-semibold"
               >
                 <Plus className="h-3.5 w-3.5" /> Prêt espèces
@@ -380,8 +378,8 @@ export default function ClientHistoriquePage() {
         </div>
       )}
 
-      {/* Modal prêt */}
-      {showPret && (
+      {/* Modal prêt — conditionné par pretClient comme dans ClientsPage */}
+      {pretClient && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
             <div className="flex items-center gap-2">
@@ -390,7 +388,7 @@ export default function ClientHistoriquePage() {
               </div>
               <div>
                 <h2 className="font-semibold text-lg">Prêt espèces</h2>
-                <p className="text-xs text-muted-foreground">{client.name}</p>
+                <p className="text-xs text-muted-foreground">{pretClient.name}</p>
               </div>
             </div>
 
@@ -428,11 +426,11 @@ export default function ClientHistoriquePage() {
                 <div className="bg-slate-50 rounded-md px-3 py-2 space-y-1 text-xs">
                   <div className="flex justify-between text-slate-600">
                     <span>Solde actuel</span>
-                    <span className="font-medium text-red-500">{formatCurrency(client.solde)}</span>
+                    <span className="font-medium text-red-500">{formatCurrency(pretClient.solde)}</span>
                   </div>
                   <div className="flex justify-between text-slate-600">
                     <span>Après prêt</span>
-                    <span className="font-medium text-red-500">{formatCurrency(client.solde + parseFloat(pretMontant))}</span>
+                    <span className="font-medium text-red-500">{formatCurrency(pretClient.solde + parseFloat(pretMontant))}</span>
                   </div>
                 </div>
               )}
@@ -440,7 +438,7 @@ export default function ClientHistoriquePage() {
 
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => {
-                setShowPret(false)
+                setPretClient(null)
                 setPretMontant('')
                 setPretNotes('')
               }}>
@@ -452,7 +450,7 @@ export default function ClientHistoriquePage() {
                 isLoading={pretSubmitting}
                 disabled={!pretMontant || parseFloat(pretMontant) <= 0}
               >
-                <Banknote className="h-4 w-4" /> Enregistrer
+                <Banknote className="h-4 w-4" /> Enregistrer le prêt
               </Button>
             </div>
           </div>
