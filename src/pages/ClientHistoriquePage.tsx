@@ -145,12 +145,12 @@ export default function ClientHistoriquePage() {
         })
       if (rError) throw rError
 
-      toast.success('Prêt enregistré', `${formatCurrency(montant)} XOF prêté à ${client.name}`)
-      setShowPret(false)
-      setPretMontant('')
-      setPretNotes('')
-      await load()
-    } catch {
+       toast.success('Prêt enregistré', `${formatCurrency(montant)} XOF prêté à ${client.name}`)
+          setPretMontant('')
+          setPretNotes('')
+          setShowPret(false)
+          await load()
+          } catch {
       toast.error('Erreur', 'Impossible d\'enregistrer le prêt')
     } finally {
       setPretSubmitting(false)
