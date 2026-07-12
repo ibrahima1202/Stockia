@@ -75,13 +75,13 @@ export default function ClientHistoriquePage() {
     }
   }
 
-  useEffect(() => { load() }, [id])
+  useEffect(() => { load() }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleReglement = async () => {
     if (!client || !reglementMontant || parseFloat(reglementMontant) <= 0) return
     setReglementSubmitting(true)
     try {
-      const { user } = (await supabase.auth.getUser()).data
+      const { data: { user } } = await supabase.auth.getUser()
       await clientService.addReglement(
         client.id,
         parseFloat(reglementMontant),
@@ -111,12 +111,14 @@ export default function ClientHistoriquePage() {
       const reference = generateReference('PRE')
       const today = format(new Date(), 'yyyy-MM-dd')
 
+      // 1. Augmenter le solde du client
       const { error: clientError } = await supabase
         .from('clients')
         .update({ solde: client.solde + montant })
         .eq('id', client.id)
       if (clientError) throw clientError
 
+      // 2. Journal — sortie caisse
       const { error: journalError } = await supabase
         .from('journal_entries')
         .insert({
@@ -130,6 +132,7 @@ export default function ClientHistoriquePage() {
         })
       if (journalError) throw journalError
 
+      // 3. Enregistrer dans reglements_clients avec montant négatif
       const { error: rError } = await supabase
         .from('reglements_clients')
         .insert({
@@ -204,14 +207,12 @@ export default function ClientHistoriquePage() {
             >
               <Banknote className="h-3.5 w-3.5" /> Prêt
             </button>
-            {client.solde > 0 && (
-              <button
-                onClick={() => setShowReglement(true)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 text-emerald-600 text-xs font-semibold hover:bg-emerald-100 transition-colors"
-              >
-                <Wallet className="h-3.5 w-3.5" /> Règlement
-              </button>
-            )}
+            <button
+              onClick={() => setShowReglement(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 text-emerald-600 text-xs font-semibold hover:bg-emerald-100 transition-colors"
+            >
+              <Wallet className="h-3.5 w-3.5" /> Règlement
+            </button>
           </div>
         </div>
       </div>
@@ -350,10 +351,19 @@ export default function ClientHistoriquePage() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => { setShowReglement(false); setReglementMontant(''); setReglementNotes('') }}>
+              <Button variant="outline" className="flex-1" onClick={() => {
+                setShowReglement(false)
+                setReglementMontant('')
+                setReglementNotes('')
+              }}>
                 Annuler
               </Button>
-              <Button className="flex-1" onClick={handleReglement} isLoading={reglementSubmitting} disabled={!reglementMontant}>
+              <Button
+                className="flex-1"
+                onClick={handleReglement}
+                isLoading={reglementSubmitting}
+                disabled={!reglementMontant}
+              >
                 Enregistrer
               </Button>
             </div>
@@ -420,7 +430,11 @@ export default function ClientHistoriquePage() {
             </div>
 
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => { setShowPret(false); setPretMontant(''); setPretNotes('') }}>
+              <Button variant="outline" className="flex-1" onClick={() => {
+                setShowPret(false)
+                setPretMontant('')
+                setPretNotes('')
+              }}>
                 Annuler
               </Button>
               <Button
