@@ -59,6 +59,12 @@ export default function ClientHistoriquePage() {
   const [pretNotes, setPretNotes] = useState('')
   const [pretSubmitting, setPretSubmitting] = useState(false)
 
+  const loadHistorique = async () => {
+    if (!id) return
+    const h = await clientService.getHistorique(id)
+    setHistorique(h)
+  }
+
   const load = async () => {
     if (!id) return
     setIsLoading(true)
@@ -82,19 +88,23 @@ export default function ClientHistoriquePage() {
     setReglementSubmitting(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
+      const montant = parseFloat(reglementMontant)
       await clientService.addReglement(
         client.id,
-        parseFloat(reglementMontant),
+        montant,
         reglementMethod,
         reglementNotes,
         null,
         user?.id ?? ''
       )
-      toast.success('Règlement enregistré', `${formatCurrency(parseFloat(reglementMontant))} XOF reçu`)
+      // Fermer d'abord
       setShowReglement(false)
       setReglementMontant('')
       setReglementNotes('')
-      await load()
+      // Mettre à jour localement
+      setClient((prev) => prev ? { ...prev, solde: Math.max(0, prev.solde - montant) } : prev)
+      toast.success('Règlement enregistré', `${formatCurrency(montant)} XOF reçu`)
+      loadHistorique()
     } catch {
       toast.error('Erreur', 'Impossible d\'enregistrer le règlement')
     } finally {
@@ -111,14 +121,12 @@ export default function ClientHistoriquePage() {
       const reference = generateReference('PRE')
       const today = format(new Date(), 'yyyy-MM-dd')
 
-      // 1. Augmenter le solde du client
       const { error: clientError } = await supabase
         .from('clients')
         .update({ solde: client.solde + montant })
         .eq('id', client.id)
       if (clientError) throw clientError
 
-      // 2. Journal — sortie caisse
       const { error: journalError } = await supabase
         .from('journal_entries')
         .insert({
@@ -132,7 +140,6 @@ export default function ClientHistoriquePage() {
         })
       if (journalError) throw journalError
 
-      // 3. Enregistrer dans reglements_clients avec montant négatif
       const { error: rError } = await supabase
         .from('reglements_clients')
         .insert({
@@ -145,12 +152,15 @@ export default function ClientHistoriquePage() {
         })
       if (rError) throw rError
 
-       toast.success('Prêt enregistré', `${formatCurrency(montant)} XOF prêté à ${client.name}`)
-          setPretMontant('')
-          setPretNotes('')
-          setShowPret(false)
-          load()
-          } catch {
+      // Fermer d'abord
+      setShowPret(false)
+      setPretMontant('')
+      setPretNotes('')
+      // Mettre à jour localement
+      setClient((prev) => prev ? { ...prev, solde: prev.solde + montant } : prev)
+      toast.success('Prêt enregistré', `${formatCurrency(montant)} XOF prêté à ${client.name}`)
+      loadHistorique()
+    } catch {
       toast.error('Erreur', 'Impossible d\'enregistrer le prêt')
     } finally {
       setPretSubmitting(false)
@@ -199,7 +209,6 @@ export default function ClientHistoriquePage() {
             </div>
           </div>
 
-          {/* Boutons actions */}
           <div className="flex gap-2">
             <button
               onClick={() => setShowPret(true)}
