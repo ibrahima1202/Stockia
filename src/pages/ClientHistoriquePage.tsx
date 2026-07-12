@@ -149,7 +149,7 @@ export default function ClientHistoriquePage() {
           setPretMontant('')
           setPretNotes('')
           setShowPret(false)
-          await load()
+          load()
           } catch {
       toast.error('Erreur', 'Impossible d\'enregistrer le prêt')
     } finally {
