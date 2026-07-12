@@ -138,17 +138,19 @@ export default function ClientHistoriquePage() {
         })
       if (journalError) throw journalError
 
-      const { error: rError } = await supabase
-        .from('reglements_clients')
-        .insert({
-          client_id: pretClient.id,
-          montant: -montant,
-          payment_method: 'especes',
-          notes: `Prêt espèces — ${reference}${pretNotes ? ` — ${pretNotes}` : ''}`,
-          reglement_date: today,
-          business_id: businessId,
-        })
-      if (rError) throw rError
+      const { data: { user } } = await supabase.auth.getUser()
+const { error: rError } = await supabase
+  .from('reglements_clients')
+  .insert({
+    client_id: pretClient.id,
+    montant: -montant,
+    payment_method: 'especes',
+    notes: `Prêt espèces — ${reference}${pretNotes ? ` — ${pretNotes}` : ''}`,
+    reglement_date: today,
+    created_by: user?.id ?? '',
+    business_id: businessId,
+  })
+if (rError) throw rError
 
       // Fermer le modal
       setPretClient(null)
