@@ -74,20 +74,29 @@ export function useSubscription() {
   const canAddUser = (currentCount: number) =>
     subscription ? subscriptionService.canAddUser(subscription, currentCount) : false
 
-  const canAccessStats = subscription?.plan?.slug === 'pro'
+  // Plans "tout inclus" (équivalent Pro) : pro national + pro_kadiolo
+  const FULL_ACCESS_SLUGS = ['pro', 'pro_kadiolo']
+
+  const canAccessStats = FULL_ACCESS_SLUGS.includes(subscription?.plan?.slug ?? '')
 
   const canAccessClientsAndFournisseurs =
     subscription?.plan?.slug === 'business' ||
-    subscription?.plan?.slug === 'pro'
+    FULL_ACCESS_SLUGS.includes(subscription?.plan?.slug ?? '')
 
-  const canExportPDF = subscription?.plan?.slug === 'pro'
+  const canExportPDF = FULL_ACCESS_SLUGS.includes(subscription?.plan?.slug ?? '')
 
   const currentPlan = subscription?.plan ?? null
+
+  // Plans à proposer selon la zone du commerce
+  const availablePlans = business?.zone === 'kadiolo'
+    ? plans.filter(p => p.slug === 'starter' || p.slug === 'pro_kadiolo')
+    : plans.filter(p => p.slug !== 'pro_kadiolo')
 
   return {
     subscription,
     business,
     plans,
+    availablePlans,
     isLoading,
     reload: load,
     createBusiness,
