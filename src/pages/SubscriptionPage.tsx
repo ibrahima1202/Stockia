@@ -100,6 +100,14 @@ export default function SubscriptionPage() {
 
   const getSavings = (monthlyPrice: number) => monthlyPrice * 2
 
+  // Adapte le nombre de colonnes et centre la grille selon le nombre de plans disponibles
+  const gridClass =
+    availablePlans.length === 1
+      ? 'grid-cols-1 max-w-sm'
+      : availablePlans.length === 2
+      ? 'grid-cols-1 md:grid-cols-2 max-w-2xl'
+      : 'grid-cols-1 md:grid-cols-3 max-w-5xl'
+
   return (
     <div className="space-y-5">
       <button
@@ -190,7 +198,7 @@ export default function SubscriptionPage() {
       )}
 
       {/* Cartes des plans */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className={`grid gap-4 mx-auto ${gridClass}`}>
         {availablePlans.map((plan) => {
           const isCurrent = subscription?.plan_id === plan.id
           const isPopular = plan.slug === 'business'
