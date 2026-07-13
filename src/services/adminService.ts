@@ -90,6 +90,16 @@ export const adminService = {
     }
   },
 
+  async deactivateSubscription(subscriptionId: string): Promise<void> {
+    const { error } = await supabase
+      .from('subscriptions')
+      .update({
+        status: 'trial',
+      })
+      .eq('id', subscriptionId)
+    if (error) throw error
+  },
+
   async changePlan(subscriptionId: string, planId: string): Promise<void> {
     const periodEnd = new Date()
     periodEnd.setMonth(periodEnd.getMonth() + 1)
