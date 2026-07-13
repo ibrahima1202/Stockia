@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { CheckCircle, Crown, RefreshCw, Building2, Calendar, CreditCard, MapPin } from 'lucide-react'
+import { CheckCircle, Crown, RefreshCw, Building2, Calendar, CreditCard, MapPin, XCircle } from 'lucide-react'
 import { LoadingScreen, Badge } from '@/components/ui/index'
 import { Button } from '@/components/ui/button'
 import { adminService, type AdminBusiness } from '@/services/adminService'
@@ -68,6 +68,24 @@ export default function AdminPage() {
     }
   }
 
+  const handleDeactivate = async (subscriptionId: string, businessName: string) => {
+    const confirmed = window.confirm(
+      `Désactiver l'abonnement de "${businessName}" ?\n\nLe compte repassera en statut "Essai".`
+    )
+    if (!confirmed) return
+
+    setActivating(subscriptionId)
+    try {
+      await adminService.deactivateSubscription(subscriptionId)
+      toast.success('Abonnement désactivé', 'Le compte est repassé en essai')
+      await load()
+    } catch {
+      toast.error('Erreur', 'Impossible de désactiver l\'abonnement')
+    } finally {
+      setActivating(null)
+    }
+  }
+
   const handleChangePlan = async (subscriptionId: string, planId: string) => {
     setActivating(subscriptionId)
     try {
@@ -98,6 +116,7 @@ export default function AdminPage() {
     if (status === 'active') return <Badge variant="success">Actif</Badge>
     if (status === 'trial') return <Badge variant="warning">Essai</Badge>
     if (status === 'expired') return <Badge variant="danger">Expiré</Badge>
+    if (status === 'cancelled') return <Badge variant="danger">Annulé</Badge>
     return <Badge variant="default">{status}</Badge>
   }
 
@@ -280,7 +299,7 @@ export default function AdminPage() {
                   {plan.name} — {formatCurrency(plan.price)}
                 </button>
               ))}
-              {biz.subscription?.status !== 'active' && (
+              {biz.subscription?.status !== 'active' ? (
                 <button
                   onClick={() => biz.subscription && handleActivate(biz.subscription.id, biz.subscription.plan_id)}
                   disabled={activating === biz.subscription?.id}
@@ -288,6 +307,15 @@ export default function AdminPage() {
                 >
                   <CheckCircle className="h-3 w-3 inline mr-1" />
                   Activer
+                </button>
+              ) : (
+                <button
+                  onClick={() => biz.subscription && handleDeactivate(biz.subscription.id, biz.name)}
+                  disabled={activating === biz.subscription?.id}
+                  className="px-3 py-1.5 rounded-md text-xs font-medium bg-red-600 hover:bg-red-500 text-white transition-colors"
+                >
+                  <XCircle className="h-3 w-3 inline mr-1" />
+                  Désactiver
                 </button>
               )}
             </div>
