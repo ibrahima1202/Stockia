@@ -1,11 +1,14 @@
 import { supabase } from '@/lib/supabase'
 
+export type BusinessZone = 'standard' | 'kadiolo'
+
 export interface AdminBusiness {
   id: string
   name: string
   phone?: string
   city?: string
   owner_id: string
+  zone?: BusinessZone
   created_at: string
   subscription?: {
     id: string
@@ -39,20 +42,17 @@ export const adminService = {
       .order('created_at', { ascending: false })
     if (bizError) throw bizError
     if (!businesses || businesses.length === 0) return []
-
     // 2. Récupérer les abonnements avec plans
     const { data: subscriptions, error: subError } = await supabase
       .from('subscriptions')
       .select('*, plan:plans(*)')
     if (subError) throw subError
-
     // 3. Récupérer les paiements en attente
     const { data: payments, error: payError } = await supabase
       .from('payments')
       .select('*')
       .eq('status', 'pending')
     if (payError) throw payError
-
     // 4. Assembler les données
     return businesses.map((biz) => ({
       ...biz,
@@ -72,7 +72,6 @@ export const adminService = {
   ): Promise<void> {
     const periodEnd = new Date()
     periodEnd.setMonth(periodEnd.getMonth() + durationMonths)
-
     const { error } = await supabase
       .from('subscriptions')
       .update({
@@ -83,7 +82,6 @@ export const adminService = {
       })
       .eq('id', subscriptionId)
     if (error) throw error
-
     if (paymentId) {
       await supabase
         .from('payments')
@@ -95,7 +93,6 @@ export const adminService = {
   async changePlan(subscriptionId: string, planId: string): Promise<void> {
     const periodEnd = new Date()
     periodEnd.setMonth(periodEnd.getMonth() + 1)
-
     const { error } = await supabase
       .from('subscriptions')
       .update({
@@ -104,6 +101,14 @@ export const adminService = {
         current_period_end: periodEnd.toISOString(),
       })
       .eq('id', subscriptionId)
+    if (error) throw error
+  },
+
+  async updateBusinessZone(businessId: string, zone: BusinessZone): Promise<void> {
+    const { error } = await supabase
+      .from('businesses')
+      .update({ zone })
+      .eq('id', businessId)
     if (error) throw error
   },
 
