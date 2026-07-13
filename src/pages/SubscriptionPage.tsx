@@ -53,6 +53,21 @@ const PLAN_DETAILS = {
       { label: 'Support prioritaire', value: '', included: true },
     ]
   },
+  pro_kadiolo: {
+    description: 'Toutes les fonctionnalités Pro, tarif spécial zone Kadiolo',
+    color: 'purple',
+    icon: BarChart3,
+    details: [
+      { label: 'Produits', value: 'Illimités', included: true },
+      { label: 'Utilisateurs', value: 'Illimités', included: true },
+      { label: 'Ventes & Stock', value: '', included: true },
+      { label: 'Journal comptable', value: '', included: true },
+      { label: 'Clients & Fournisseurs', value: '', included: true },
+      { label: 'Statistiques & Bénéfices', value: '', included: true },
+      { label: 'Export PDF', value: '', included: true },
+      { label: 'Support prioritaire', value: '', included: true },
+    ]
+  },
 }
 
 const colorMap = {
@@ -72,7 +87,7 @@ const colorMap = {
 
 export default function SubscriptionPage() {
   const navigate = useNavigate()
-  const { subscription, plans } = useSubscription()
+  const { subscription, availablePlans } = useSubscription()
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly')
 
   const daysLeft = subscription ? subscriptionService.getDaysLeftInTrial(subscription) : 0
@@ -176,10 +191,10 @@ export default function SubscriptionPage() {
 
       {/* Cartes des plans */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {plans.map((plan) => {
+        {availablePlans.map((plan) => {
           const isCurrent = subscription?.plan_id === plan.id
           const isPopular = plan.slug === 'business'
-          const isPro = plan.slug === 'pro'
+          const isPro = plan.slug === 'pro' || plan.slug === 'pro_kadiolo'
           const detail = PLAN_DETAILS[plan.slug as keyof typeof PLAN_DETAILS]
           const colors = colorMap[detail?.color as keyof typeof colorMap] ?? colorMap.orange
           const PlanIcon = detail?.icon ?? Package
