@@ -276,7 +276,7 @@ export interface CreateSalePayload {
 export interface Plan {
   id: string
   name: string
-  slug: 'starter' | 'business' | 'pro'
+  slug: 'starter' | 'business' | 'pro' | 'pro_kadiolo'
   price: number
   max_products: number | null
   max_users: number | null
@@ -300,6 +300,8 @@ export interface Subscription {
   plan?: Plan
 }
 
+export type BusinessZone = 'standard' | 'kadiolo'
+
 export interface Business {
   id: string
   owner_id: string
@@ -309,6 +311,7 @@ export interface Business {
   city?: string
   country: string
   commerce_type: 'detail' | 'gros_detail'
+  zone?: BusinessZone
   created_at: string
   updated_at: string
 }
