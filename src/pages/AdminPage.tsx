@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { CheckCircle, Crown, RefreshCw, Building2, Calendar, CreditCard } from 'lucide-react'
+import { CheckCircle, Crown, RefreshCw, Building2, Calendar, CreditCard, MapPin } from 'lucide-react'
 import { LoadingScreen, Badge } from '@/components/ui/index'
 import { Button } from '@/components/ui/button'
 import { adminService, type AdminBusiness } from '@/services/adminService'
@@ -19,6 +19,7 @@ export default function AdminPage() {
   const [plans, setPlans] = useState<{ id: string; name: string; slug: string; price: number }[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [activating, setActivating] = useState<string | null>(null)
+  const [changingZone, setChangingZone] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -77,6 +78,19 @@ export default function AdminPage() {
       toast.error('Erreur', 'Impossible de changer le plan')
     } finally {
       setActivating(null)
+    }
+  }
+
+  const handleChangeZone = async (businessId: string, zone: 'standard' | 'kadiolo') => {
+    setChangingZone(businessId)
+    try {
+      await adminService.updateBusinessZone(businessId, zone)
+      toast.success(zone === 'kadiolo' ? 'Commerce passé en zone Kadiolo' : 'Commerce repassé en zone Standard')
+      await load()
+    } catch {
+      toast.error('Erreur', 'Impossible de changer la zone')
+    } finally {
+      setChangingZone(null)
     }
   }
 
@@ -219,6 +233,35 @@ export default function AdminPage() {
                 }
               </div>
             )}
+
+            {/* Zone du commerce */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400 flex items-center gap-1">
+                <MapPin className="h-3 w-3" /> Zone :
+              </span>
+              <button
+                onClick={() => handleChangeZone(biz.id, 'standard')}
+                disabled={changingZone === biz.id || (biz.zone ?? 'standard') === 'standard'}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  (biz.zone ?? 'standard') === 'standard'
+                    ? 'bg-slate-600 text-white'
+                    : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                }`}
+              >
+                Standard
+              </button>
+              <button
+                onClick={() => handleChangeZone(biz.id, 'kadiolo')}
+                disabled={changingZone === biz.id || biz.zone === 'kadiolo'}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  biz.zone === 'kadiolo'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                }`}
+              >
+                Kadiolo
+              </button>
+            </div>
 
             {/* Changer de plan */}
             <div className="flex flex-wrap gap-2">
