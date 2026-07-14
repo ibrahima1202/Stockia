@@ -1,7 +1,7 @@
 // ============================================================
 // STOCKAM — Types TypeScript
 // ============================================================
-export type UserRole = 'admin' | 'caissier' | 'magasinier' | 'promoteur'
+export type UserRole = 'admin' | 'gerant' | 'caissier' | 'magasinier' | 'promoteur'
 
 export interface Profile {
   id: string
