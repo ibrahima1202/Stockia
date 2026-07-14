@@ -5,59 +5,64 @@ export function useRole() {
   const role = profile?.role ?? 'caissier'
 
   const isAdmin = role === 'admin'
+  const isGerant = role === 'gerant'
   const isCaissier = role === 'caissier'
   const isMagasinier = role === 'magasinier'
   const isPromoteur = role === 'promoteur'
+
+  // Gérant = mêmes droits opérationnels qu'Admin, sauf équipe et abonnement
+  const isAdminLike = isAdmin || isGerant
 
   // Tableau de bord
   const canViewDashboard = true
 
   // Produits
   const canViewProducts = true
-  const canManageProducts = isAdmin || isMagasinier
+  const canManageProducts = isAdminLike || isMagasinier
 
   // Stock
-  const canManageStock = isAdmin || isMagasinier
+  const canManageStock = isAdminLike || isMagasinier
 
   // Ventes
-  const canManageSales = isAdmin || isCaissier
-  const canCreateSale = isAdmin || isCaissier
-  const canCancelSale = isAdmin || isCaissier
-  const canApplyDiscount = isAdmin || isCaissier
-  const canExportSale = isAdmin || isCaissier
+  const canManageSales = isAdminLike || isCaissier
+  const canCreateSale = isAdminLike || isCaissier
+  const canCancelSale = isAdminLike || isCaissier
+  const canApplyDiscount = isAdminLike || isCaissier
+  const canExportSale = isAdminLike || isCaissier
 
   // Clients
-  const canViewClients = isAdmin || isCaissier || isPromoteur
-  const canManageClients = isAdmin || isCaissier
+  const canViewClients = isAdminLike || isCaissier || isPromoteur
+  const canManageClients = isAdminLike || isCaissier
 
   // Fournisseurs
-  const canViewFournisseurs = isAdmin || isCaissier || isPromoteur
-  const canManageFournisseurs = isAdmin || isCaissier
+  const canViewFournisseurs = isAdminLike || isCaissier || isPromoteur
+  const canManageFournisseurs = isAdminLike || isCaissier
 
   // Achats fournisseurs
-  const canManageAchats = isAdmin || isCaissier
+  const canManageAchats = isAdminLike || isCaissier
 
   // Dépenses
-  const canManageExpenses = isAdmin || isCaissier
+  const canManageExpenses = isAdminLike || isCaissier
 
   // Journal
-  const canViewJournal = isAdmin || isCaissier || isPromoteur
+  const canViewJournal = isAdminLike || isCaissier || isPromoteur
 
   // Statistiques
-  const canViewStats = isAdmin || isPromoteur
+  const canViewStats = isAdminLike || isPromoteur
 
-  // Équipe
+  // Équipe — réservé à Admin uniquement
   const canManageTeam = isAdmin
 
-  // Abonnement
+  // Abonnement — réservé à Admin uniquement
   const canManageSubscription = isAdmin
 
   // Export PDF
-  const canExportPDFRole = isAdmin || isCaissier
+  const canExportPDFRole = isAdminLike || isCaissier
 
   return {
     role,
     isAdmin,
+    isGerant,
     isCaissier,
     isMagasinier,
     isPromoteur,
