@@ -10,6 +10,7 @@ import type { UserRole } from '@/types'
 
 const ROLES: { value: UserRole; label: string; description: string }[] = [
   { value: 'admin', label: 'Admin', description: 'Accès complet à toutes les fonctionnalités' },
+  { value: 'gerant', label: 'Gérant', description: 'Accès complet sauf gestion d\'équipe et abonnement' },
   { value: 'caissier', label: 'Caissier', description: 'Ventes, clients, fournisseurs, dépenses, journal' },
   { value: 'magasinier', label: 'Magasinier', description: 'Gestion des produits et du stock uniquement' },
   { value: 'promoteur', label: 'Promoteur', description: 'Lecture seule de toutes les sections' },
@@ -17,6 +18,7 @@ const ROLES: { value: UserRole; label: string; description: string }[] = [
 
 const getRoleBadgeVariant = (role: string) => {
   if (role === 'admin') return 'info'
+  if (role === 'gerant') return 'info'
   if (role === 'caissier') return 'success'
   if (role === 'magasinier') return 'warning'
   return 'default'
