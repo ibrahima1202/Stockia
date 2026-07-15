@@ -28,13 +28,17 @@ export const saleService = {
   async getTodayStats(): Promise<{ revenue: number; count: number }> {
     const today = dateFormat(new Date(), 'yyyy-MM-dd')
 
-    // CA du jour = total des débits du journal du jour
-    // (ventes encaissées + règlements clients reçus)
+    // CA du jour = total des débits du journal du jour, uniquement pour les
+    // écritures qui représentent réellement du chiffre d'affaires (ventes
+    // encaissées + règlements clients reçus). On exclut explicitement les
+    // écritures manuelles (solde d'ouverture, recette hors vente...) ainsi
+    // que toute autre source qui ne doit pas compter dans le CA.
     const { data: journalData, error: jError } = await supabase
       .from('journal_entries')
       .select('debit')
       .gte('entry_date', today)
       .lte('entry_date', today)
+      .in('source_type', ['vente', 'reglement_client'])
     if (jError) throw jError
 
     const revenue = (journalData || []).reduce((sum, e) => sum + e.debit, 0)
