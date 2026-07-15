@@ -2,6 +2,16 @@ import { supabase } from '@/lib/supabase'
 import type { JournalEntry } from '@/types'
 import { format } from 'date-fns'
 export const journalService = {
+  // Solde caisse global, recalculé par somme totale (immunisé contre l'antidatage).
+  // Remplace l'ancienne version qui lisait la dernière `balance` stockée en base.
+  // Placé en premier car getAll() s'appuie dessus comme point d'ancrage.
+  async getCurrentBalance(): Promise<number> {
+    const { data, error } = await supabase
+      .from('journal_entries')
+      .select('debit, credit')
+    if (error) return 0
+    return (data || []).reduce((sum, e) => sum + e.debit - e.credit, 0)
+  },
   async getAll(limit = 200): Promise<JournalEntry[]> {
     const { data, error } = await supabase
       .from('journal_entries')
@@ -10,9 +20,39 @@ export const journalService = {
       .order('created_at', { ascending: false })
       .limit(limit)
     if (error) throw error
-    return data
+
+    const batch = data || []
+
+    // Ne jamais faire confiance à la colonne `balance` stockée : elle peut être
+    // fausse dès qu'une écriture a été insérée après coup avec une date antérieure
+    // (solde d'ouverture ajouté tardivement, correction manuelle, etc.)
+    // On ancre le calcul sur le solde global réel (getCurrentBalance), puis on
+    // retire la variation apportée par ce lot pour retrouver le solde d'ouverture
+    // du lot — utile si `limit` exclut des écritures plus anciennes.
+    const batchDelta = batch.reduce((sum, e) => sum + e.debit - e.credit, 0)
+    const totalBalance = await this.getCurrentBalance()
+    let running = totalBalance - batchDelta
+
+    // Calcul en ordre chronologique (ancien → récent), puis ré-affichage
+    // du plus récent au plus ancien comme avant.
+    const ascending = [...batch].reverse()
+    const withRecalculatedBalance = ascending.map(entry => {
+      running += entry.debit - entry.credit
+      return { ...entry, balance: running }
+    })
+    return withRecalculatedBalance.reverse()
   },
   async getByDateRange(from: string, to: string): Promise<JournalEntry[]> {
+    // Solde d'ouverture : somme de toutes les écritures AVANT la période filtrée.
+    // Sans ça, le solde affiché sur chaque ligne repartait de zéro au début du
+    // filtre au lieu de refléter le vrai solde cumulé depuis le début de l'activité.
+    const { data: priorData, error: priorError } = await supabase
+      .from('journal_entries')
+      .select('debit, credit')
+      .lt('entry_date', from)
+    if (priorError) throw priorError
+    const openingBalance = (priorData || []).reduce((sum, e) => sum + e.debit - e.credit, 0)
+
     const { data, error } = await supabase
       .from('journal_entries')
       .select('*')
@@ -21,25 +61,17 @@ export const journalService = {
       .order('entry_date', { ascending: true })
       .order('created_at', { ascending: true })
     if (error) throw error
-    // Recalcul du solde cumulé à la volée, en ordre chronologique réel.
-    // Ne fait jamais confiance à la colonne `balance` stockée, qui peut être
-    // faussée par des écritures créées après-coup avec une entry_date antérieure
-    // (solde d'ouverture, dette oubliée, correction manuelle, etc.)
-    let running = 0
+
+    // Recalcul du solde cumulé à la volée, en ordre chronologique réel, à partir
+    // du solde d'ouverture. Ne fait jamais confiance à la colonne `balance` stockée,
+    // qui peut être faussée par des écritures créées après-coup avec une entry_date
+    // antérieure (solde d'ouverture, dette oubliée, correction manuelle, etc.)
+    let running = openingBalance
     const withRecalculatedBalance = (data || []).map(entry => {
       running += entry.debit - entry.credit
       return { ...entry, balance: running }
     })
     return withRecalculatedBalance
-  },
-  // Solde caisse global, recalculé par somme totale (immunisé contre l'antidatage).
-  // Remplace l'ancienne version qui lisait la dernière `balance` stockée en base.
-  async getCurrentBalance(): Promise<number> {
-    const { data, error } = await supabase
-      .from('journal_entries')
-      .select('debit, credit')
-    if (error) return 0
-    return (data || []).reduce((sum, e) => sum + e.debit - e.credit, 0)
   },
   async getTodaySummary(): Promise<{ total_debit: number; total_credit: number }> {
     const today = format(new Date(), 'yyyy-MM-dd')
