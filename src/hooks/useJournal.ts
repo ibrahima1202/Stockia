@@ -5,6 +5,7 @@ import { useToast } from '@/store/toastStore'
 
 export function useJournal() {
   const [entries, setEntries] = useState<JournalEntry[]>([])
+  const [currentBalance, setCurrentBalance] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const toast = useToast()
 
@@ -16,10 +17,14 @@ export function useJournal() {
     lastParams.current = { from, to }
     try {
       setIsLoading(true)
-      const data = from && to
-        ? await journalService.getByDateRange(from, to)
-        : await journalService.getAll()
+      const [data, balance] = await Promise.all([
+        from && to ? journalService.getByDateRange(from, to) : journalService.getAll(),
+        // Solde global réel, toujours calculé sur l'ensemble des écritures,
+        // indépendamment de la période filtrée affichée dans le tableau.
+        journalService.getCurrentBalance(),
+      ])
       setEntries(data)
+      setCurrentBalance(balance)
     } catch {
       toast.error('Erreur', 'Impossible de charger le journal')
     } finally {
@@ -61,5 +66,5 @@ export function useJournal() {
 
   useEffect(() => { load() }, [load])
 
-  return { entries, isLoading, reload: load, updateEntry, deleteEntry }
+  return { entries, currentBalance, isLoading, reload: load, updateEntry, deleteEntry }
 }
