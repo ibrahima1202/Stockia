@@ -29,7 +29,7 @@ export default function JournalPage() {
   const today = new Date()
   const [dateFrom, setDateFrom] = useState(format(startOfMonth(today), 'yyyy-MM-dd'))
   const [dateTo, setDateTo] = useState(format(endOfMonth(today), 'yyyy-MM-dd'))
-  const { entries, isLoading, reload, updateEntry, deleteEntry } = useJournal()
+  const { entries, currentBalance, isLoading, reload, updateEntry, deleteEntry } = useJournal()
   const { canExportPDF, business } = useSubscription()
   const { canViewJournal, canExportPDFRole } = useRole()
 
@@ -48,7 +48,6 @@ export default function JournalPage() {
 
   const totalDebit = entries.reduce((s, e) => s + e.debit, 0)
   const totalCredit = entries.reduce((s, e) => s + e.credit, 0)
-  const lastBalance = entries.length > 0 ? entries[0].balance : 0
 
   const handleFilter = () => reload(dateFrom, dateTo)
 
@@ -134,6 +133,16 @@ export default function JournalPage() {
     }
   }
 
+  const handleThisMonth = () => {
+    const from = format(startOfMonth(today), 'yyyy-MM-dd')
+    const to = format(endOfMonth(today), 'yyyy-MM-dd')
+    setDateFrom(from)
+    setDateTo(to)
+    // On passe explicitement les nouvelles dates : reload() seul rechargeait
+    // encore avec les anciens filtres mémorisés (bug d'origine du solde affiché).
+    reload(from, to)
+  }
+
   const canExport = canExportPDF && canExportPDFRole
 
   if (isLoading) return <LoadingScreen text="Chargement du journal..." />
@@ -195,8 +204,8 @@ export default function JournalPage() {
         </Card>
         <Card className="p-3 sm:p-4 min-w-0">
           <p className="text-[11px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide">Solde actuel</p>
-          <p className={`text-sm sm:text-xl font-bold mt-1 leading-snug ${lastBalance >= 0 ? 'text-foreground' : 'text-red-600'}`}>
-            {formatCurrency(lastBalance)}
+          <p className={`text-sm sm:text-xl font-bold mt-1 leading-snug ${currentBalance >= 0 ? 'text-foreground' : 'text-red-600'}`}>
+            {formatCurrency(currentBalance)}
           </p>
         </Card>
       </div>
@@ -223,15 +232,7 @@ export default function JournalPage() {
             />
           </div>
           <Button onClick={handleFilter} variant="outline" size="sm">Filtrer</Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setDateFrom(format(startOfMonth(today), 'yyyy-MM-dd'))
-              setDateTo(format(endOfMonth(today), 'yyyy-MM-dd'))
-              reload()
-            }}
-          >
+          <Button variant="ghost" size="sm" onClick={handleThisMonth}>
             Ce mois
           </Button>
         </div>
@@ -424,7 +425,7 @@ export default function JournalPage() {
                 isLoading={manualSubmitting}
                 disabled={!manualLabel.trim() || !manualAmount || parseFloat(manualAmount) <= 0}
               >
-                {editingId ? 'Enregistrer' : 'Enregistrer'}
+                Enregistrer
               </Button>
             </div>
           </div>
