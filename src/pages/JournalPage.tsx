@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookOpen, FileDown, Lock, Plus } from 'lucide-react'
+import { BookOpen, FileDown, Lock, Plus, Pencil, Trash2 } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   Badge, EmptyState, Card
@@ -14,6 +14,7 @@ import { pdfService } from '@/services/pdfService'
 import { supabase } from '@/lib/supabase'
 import { getBusinessId } from '@/lib/business'
 import { generateReference } from '@/lib/utils'
+import type { JournalEntry } from '@/types'
 
 const sourceLabels: Record<string, { label: string; variant: 'success' | 'danger' | 'info' }> = {
   vente: { label: 'Vente', variant: 'success' },
@@ -28,17 +29,22 @@ export default function JournalPage() {
   const today = new Date()
   const [dateFrom, setDateFrom] = useState(format(startOfMonth(today), 'yyyy-MM-dd'))
   const [dateTo, setDateTo] = useState(format(endOfMonth(today), 'yyyy-MM-dd'))
-  const { entries, isLoading, reload } = useJournal()
+  const { entries, isLoading, reload, updateEntry, deleteEntry } = useJournal()
   const { canExportPDF, business } = useSubscription()
   const { canViewJournal, canExportPDFRole } = useRole()
 
-  // Modal entrée manuelle
+  // Modal entrée manuelle (création ET édition)
   const [showManual, setShowManual] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [manualLabel, setManualLabel] = useState('')
   const [manualAmount, setManualAmount] = useState('')
   const [manualType, setManualType] = useState<'debit' | 'credit'>('debit')
   const [manualDate, setManualDate] = useState(format(today, 'yyyy-MM-dd'))
   const [manualSubmitting, setManualSubmitting] = useState(false)
+
+  // Modal de confirmation de suppression
+  const [deletingEntry, setDeletingEntry] = useState<JournalEntry | null>(null)
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
 
   const totalDebit = entries.reduce((s, e) => s + e.debit, 0)
   const totalCredit = entries.reduce((s, e) => s + e.credit, 0)
@@ -51,33 +57,80 @@ export default function JournalPage() {
     pdfService.exportJournal(entries, business?.name ?? 'Mon Commerce', period)
   }
 
+  const resetManualForm = () => {
+    setShowManual(false)
+    setEditingId(null)
+    setManualLabel('')
+    setManualAmount('')
+    setManualType('debit')
+    setManualDate(format(today, 'yyyy-MM-dd'))
+  }
+
+  const openCreateModal = () => {
+    setEditingId(null)
+    setManualLabel('')
+    setManualAmount('')
+    setManualType('debit')
+    setManualDate(format(today, 'yyyy-MM-dd'))
+    setShowManual(true)
+  }
+
+  const openEditModal = (entry: JournalEntry) => {
+    setEditingId(entry.id)
+    setManualLabel(entry.label)
+    setManualAmount(String(entry.debit > 0 ? entry.debit : entry.credit))
+    setManualType(entry.debit > 0 ? 'debit' : 'credit')
+    setManualDate(entry.entry_date)
+    setShowManual(true)
+  }
+
   const handleManualEntry = async () => {
     if (!manualLabel.trim() || !manualAmount || parseFloat(manualAmount) <= 0) return
     setManualSubmitting(true)
     try {
-      const reference = generateReference('MAN')
-      const businessId = getBusinessId()
       const amount = parseFloat(manualAmount)
 
-      await supabase.from('journal_entries').insert({
-        entry_date: manualDate,
-        reference,
-        label: manualLabel.trim(),
-        debit: manualType === 'debit' ? amount : 0,
-        credit: manualType === 'credit' ? amount : 0,
-        source_type: 'manuel',
-        business_id: businessId,
-      })
+      if (editingId) {
+        // Édition d'une écriture manuelle existante
+        const success = await updateEntry(editingId, {
+          entry_date: manualDate,
+          label: manualLabel.trim(),
+          debit: manualType === 'debit' ? amount : 0,
+          credit: manualType === 'credit' ? amount : 0,
+        })
+        if (success) resetManualForm()
+      } else {
+        // Création d'une nouvelle écriture manuelle
+        const reference = generateReference('MAN')
+        const businessId = getBusinessId()
 
-      setShowManual(false)
-      setManualLabel('')
-      setManualAmount('')
-      setManualType('debit')
-      setManualDate(format(today, 'yyyy-MM-dd'))
-      reload(dateFrom, dateTo)
+        await supabase.from('journal_entries').insert({
+          entry_date: manualDate,
+          reference,
+          label: manualLabel.trim(),
+          debit: manualType === 'debit' ? amount : 0,
+          credit: manualType === 'credit' ? amount : 0,
+          source_type: 'manuel',
+          business_id: businessId,
+        })
+
+        resetManualForm()
+        reload(dateFrom, dateTo)
+      }
     } catch {
     } finally {
       setManualSubmitting(false)
+    }
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deletingEntry) return
+    setDeleteSubmitting(true)
+    try {
+      const success = await deleteEntry(deletingEntry.id)
+      if (success) setDeletingEntry(null)
+    } finally {
+      setDeleteSubmitting(false)
     }
   }
 
@@ -109,7 +162,7 @@ export default function JournalPage() {
           <p className="text-sm text-muted-foreground">{entries.length} écriture(s)</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => setShowManual(true)} variant="outline">
+          <Button onClick={openCreateModal} variant="outline">
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Entrée manuelle</span>
           </Button>
@@ -199,11 +252,13 @@ export default function JournalPage() {
                 <TableHead className="text-right text-emerald-600">Entrée (Débit)</TableHead>
                 <TableHead className="text-right text-red-500">Sortie (Crédit)</TableHead>
                 <TableHead className="text-right">Solde</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {entries.map((entry) => {
                 const src = entry.source_type ? sourceLabels[entry.source_type] : null
+                const isManual = entry.source_type === 'manuel'
                 return (
                   <TableRow key={entry.id}>
                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
@@ -227,6 +282,28 @@ export default function JournalPage() {
                     <TableCell className={`text-right font-semibold ${entry.balance < 0 ? 'text-red-600' : ''}`}>
                       {formatCurrency(entry.balance)}
                     </TableCell>
+                    <TableCell className="text-right">
+                      {isManual ? (
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => openEditModal(entry)}
+                            className="p-1.5 rounded-md text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                            title="Modifier"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setDeletingEntry(entry)}
+                            className="p-1.5 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 )
               })}
@@ -237,20 +314,25 @@ export default function JournalPage() {
                 <td className="px-3 py-2.5 text-right text-emerald-600">{formatCurrency(totalDebit)}</td>
                 <td className="px-3 py-2.5 text-right text-red-500">{formatCurrency(totalCredit)}</td>
                 <td className="px-3 py-2.5 text-right">{formatCurrency(totalDebit - totalCredit)}</td>
+                <td></td>
               </tr>
             </tfoot>
           </Table>
         )}
       </div>
 
-      {/* Modal entrée manuelle */}
+      {/* Modal entrée manuelle (création / édition) */}
       {showManual && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
-            <h2 className="font-semibold text-lg">Entrée manuelle</h2>
-            <p className="text-sm text-muted-foreground">
-              Utilisez cette option pour enregistrer un solde d'ouverture, une recette ou une sortie hors vente.
-            </p>
+            <h2 className="font-semibold text-lg">
+              {editingId ? "Modifier l'écriture" : 'Entrée manuelle'}
+            </h2>
+            {!editingId && (
+              <p className="text-sm text-muted-foreground">
+                Utilisez cette option pour enregistrer un solde d'ouverture, une recette ou une sortie hors vente.
+              </p>
+            )}
 
             <div className="space-y-3">
               {/* Type */}
@@ -333,13 +415,7 @@ export default function JournalPage() {
             </div>
 
             <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => {
-                setShowManual(false)
-                setManualLabel('')
-                setManualAmount('')
-                setManualType('debit')
-                setManualDate(format(today, 'yyyy-MM-dd'))
-              }}>
+              <Button variant="outline" className="flex-1" onClick={resetManualForm}>
                 Annuler
               </Button>
               <Button
@@ -348,7 +424,41 @@ export default function JournalPage() {
                 isLoading={manualSubmitting}
                 disabled={!manualLabel.trim() || !manualAmount || parseFloat(manualAmount) <= 0}
               >
-                Enregistrer
+                {editingId ? 'Enregistrer' : 'Enregistrer'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmation de suppression */}
+      {deletingEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 space-y-4">
+            <h2 className="font-semibold text-lg">Supprimer cette écriture ?</h2>
+            <p className="text-sm text-muted-foreground">
+              Cette action est irréversible. L'écriture <strong>{deletingEntry.label}</strong> du{' '}
+              {formatDate(deletingEntry.entry_date)} pour un montant de{' '}
+              <strong>
+                {formatCurrency(deletingEntry.debit > 0 ? deletingEntry.debit : deletingEntry.credit)}
+              </strong>{' '}
+              sera définitivement supprimée.
+            </p>
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setDeletingEntry(null)}
+                disabled={deleteSubmitting}
+              >
+                Annuler
+              </Button>
+              <Button
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                onClick={handleConfirmDelete}
+                isLoading={deleteSubmitting}
+              >
+                Supprimer
               </Button>
             </div>
           </div>
@@ -356,4 +466,4 @@ export default function JournalPage() {
       )}
     </div>
   )
-              }
+}
