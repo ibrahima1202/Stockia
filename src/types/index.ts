@@ -2,23 +2,21 @@
 // STOCKAM — Types TypeScript
 // ============================================================
 export type UserRole = 'admin' | 'gerant' | 'caissier' | 'magasinier' | 'promoteur'
-
 export interface Profile {
   id: string
   full_name: string
   role: UserRole
   business_id?: string | null
   is_active?: boolean
+  phone?: string | null
   created_at: string
   updated_at: string
 }
-
 export interface Category {
   id: string
   name: string
   created_at: string
 }
-
 export interface ProductUnit {
   id: string
   product_id: string
@@ -30,7 +28,6 @@ export interface ProductUnit {
   is_active: boolean
   created_at: string
 }
-
 export interface Product {
   id: string
   name: string
@@ -47,9 +44,7 @@ export interface Product {
   category?: Category
   units?: ProductUnit[]
 }
-
 export type StockMovementType = 'entree' | 'sortie'
-
 export interface StockMovement {
   id: string
   product_id: string
@@ -62,12 +57,9 @@ export interface StockMovement {
   product?: Product
   profile?: Profile
 }
-
 export type PaymentMethod = 'especes' | 'mobile_money' | 'carte'
 export type SaleStatut = 'paye' | 'credit' | 'partiel'
-
-export interface Sale {
-  id: string
+export interface Sale {id: string
   reference: string
   total_amount: number
   discount_amount?: number
@@ -82,7 +74,6 @@ export interface Sale {
   profile?: Profile
   client?: Client
 }
-
 export interface SaleItem {
   id: string
   sale_id: string
@@ -97,10 +88,7 @@ export interface SaleItem {
   total_price: number
   created_at: string
   product?: Product
-}
-
-export type ExpenseCategory = 'transport' | 'loyer' | 'divers'
-
+}export type ExpenseCategory = 'transport' | 'loyer' | 'divers'
 export interface Expense {
   id: string
   category: ExpenseCategory
@@ -111,9 +99,7 @@ export interface Expense {
   created_at: string
   profile?: Profile
 }
-
 export type JournalSourceType = 'vente' | 'depense' | 'manuel' | 'reglement_client' | 'reglement_fournisseur' | 'achat_fournisseur'
-
 export interface JournalEntry {
   id: string
   entry_date: string
@@ -126,7 +112,6 @@ export interface JournalEntry {
   source_id?: string
   created_at: string
 }
-
 // ============================================================
 // CLIENT
 // ============================================================
@@ -141,7 +126,6 @@ export interface Client {
   created_at: string
   updated_at: string
 }
-
 export interface ReglementClient {
   id: string
   client_id: string
@@ -153,9 +137,7 @@ export interface ReglementClient {
   created_by?: string
   created_at: string
   client?: Client
-}
-
-// ============================================================
+}// ============================================================
 // FOURNISSEUR
 // ============================================================
 export interface Fournisseur {
@@ -169,7 +151,6 @@ export interface Fournisseur {
   created_at: string
   updated_at: string
 }
-
 export interface ReglementFournisseur {
   id: string
   fournisseur_id: string
@@ -181,7 +162,6 @@ export interface ReglementFournisseur {
   created_at: string
   fournisseur?: Fournisseur
 }
-
 export interface AchatItem {
   id: string
   achat_id: string
@@ -192,9 +172,7 @@ export interface AchatItem {
   created_at: string
   product?: Product
 }
-
 export type AchatStatut = 'comptant' | 'credit' | 'partiel'
-
 export interface AchatFournisseur {
   id: string
   fournisseur_id: string
@@ -210,14 +188,12 @@ export interface AchatFournisseur {
   fournisseur?: Fournisseur
   achat_items?: AchatItem[]
 }
-
 export interface AchatCartItem {
   product: Product
   quantity: number
   unit_price: number
   total_price: number
 }
-
 export interface CreateAchatPayload {
   fournisseur_id: string
   items: AchatCartItem[]
@@ -226,7 +202,6 @@ export interface CreateAchatPayload {
   payment_method?: PaymentMethod
   notes?: string
 }
-
 // ============================================================
 // DASHBOARD STATS
 // ============================================================
@@ -236,12 +211,10 @@ export interface DashboardStats {
   low_stock_count: number
   cash_balance: number
 }
-
 // ============================================================
 // FORM TYPES
 // ============================================================
 export type DiscountType = 'amount' | 'percent'
-
 export interface SaleCartItem {
   product: Product
   quantity: number
@@ -253,13 +226,11 @@ export interface SaleCartItem {
   discount_amount: number
   total_price: number
 }
-
 export interface SaleDiscount {
   type: DiscountType
   value: number
   amount: number
 }
-
 export interface CreateSalePayload {
   items: SaleCartItem[]
   payment_method: PaymentMethod
@@ -269,7 +240,6 @@ export interface CreateSalePayload {
   statut?: SaleStatut
   discount?: SaleDiscount
 }
-
 // ============================================================
 // ABONNEMENTS & PLANS
 // ============================================================
@@ -284,9 +254,7 @@ export interface Plan {
   is_active: boolean
   created_at: string
 }
-
 export type SubscriptionStatus = 'trial' | 'active' | 'expired' | 'cancelled'
-
 export interface Subscription {
   id: string
   owner_id: string
@@ -299,9 +267,7 @@ export interface Subscription {
   updated_at: string
   plan?: Plan
 }
-
 export type BusinessZone = 'standard' | 'kadiolo'
-
 export interface Business {
   id: string
   owner_id: string
@@ -315,7 +281,6 @@ export interface Business {
   created_at: string
   updated_at: string
 }
-
 export interface Payment {
   id: string
   subscription_id: string
@@ -326,7 +291,6 @@ export interface Payment {
   paid_at?: string
   created_at: string
 }
-
 export interface CreateBusinessPayload {
   name: string
   phone?: string
