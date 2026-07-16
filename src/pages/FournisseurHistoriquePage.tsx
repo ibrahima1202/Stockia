@@ -50,7 +50,13 @@ export default function FournisseurHistoriquePage() {
   const handleExportAchat = (achat: FournisseurAchatEntry) => {
     pdfService.exportAchatReceipt(
       {
-        ...achat,
+        reference: achat.reference,
+        achat_date: achat.date,
+        montant_total: achat.montant_total,
+        montant_paye: achat.montant_paye,
+        statut: achat.statut,
+        notes: achat.notes,
+        achat_items: achat.achat_items,
         fournisseur: fournisseur ? { name: fournisseur.name, phone: fournisseur.phone } : null,
       },
       business?.name ?? 'Mon Commerce'
@@ -72,17 +78,13 @@ export default function FournisseurHistoriquePage() {
         user?.id ?? ''
       )
 
-      // Mettre à jour le statut de l'achat si entièrement payé
       const montantRestant = reglementAchat.montant_total - reglementAchat.montant_paye - montant
       const nouveauStatut = montantRestant <= 0 ? 'comptant' : 'partiel'
       const nouveauMontantPaye = reglementAchat.montant_paye + montant
 
       await supabase
         .from('achats_fournisseurs')
-        .update({
-          statut: nouveauStatut,
-          montant_paye: nouveauMontantPaye,
-        })
+        .update({ statut: nouveauStatut, montant_paye: nouveauMontantPaye })
         .eq('id', reglementAchat.id)
 
       toast.success('Règlement enregistré', `${formatCurrency(montant)} XOF payé`)
@@ -119,7 +121,6 @@ export default function FournisseurHistoriquePage() {
 
   const totalAchats = historique.reduce((s, a) => s + a.montant_total, 0)
   const totalPaye = historique.reduce((s, a) => s + a.montant_paye, 0)
-  const totalDu = totalAchats - totalPaye
 
   return (
     <div className="space-y-5">
@@ -179,6 +180,7 @@ export default function FournisseurHistoriquePage() {
               const montantRestant = achat.montant_total - achat.montant_paye
               return (
                 <div key={achat.id} className="bg-white rounded-lg border shadow-sm p-4 space-y-3">
+
                   {/* Header achat */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
@@ -189,7 +191,6 @@ export default function FournisseurHistoriquePage() {
                       <p className="text-xs text-muted-foreground mt-0.5">{formatDate(achat.date)}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {/* Bouton règlement si dette */}
                       {achat.statut !== 'comptant' && (
                         <button
                           onClick={() => {
@@ -201,11 +202,9 @@ export default function FournisseurHistoriquePage() {
                           <Wallet className="h-3 w-3" /> Payer
                         </button>
                       )}
-                      {/* Bouton PDF */}
                       <button
                         onClick={() => handleExportAchat(achat)}
                         className="flex items-center gap-1 px-2 py-1 rounded-lg bg-orange-50 text-orange-500 text-xs font-semibold hover:bg-orange-100 transition-colors"
-                        title="Exporter la facture PDF"
                       >
                         <FileDown className="h-3 w-3" /> PDF
                       </button>
@@ -236,12 +235,15 @@ export default function FournisseurHistoriquePage() {
 
                   {/* Total */}
                   <div className="flex items-center justify-between pt-1 border-t">
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs">
                       {achat.statut === 'partiel' && (
                         <p className="text-red-500 font-medium">Reste dû : {formatCurrency(montantRestant)}</p>
                       )}
                       {achat.statut === 'credit' && (
                         <p className="text-red-500 font-medium">Non payé</p>
+                      )}
+                      {achat.statut === 'comptant' && (
+                        <p className="text-emerald-500 font-medium">Payé intégralement</p>
                       )}
                     </div>
                     <p className="font-bold text-orange-500">{formatCurrency(achat.montant_total)}</p>
