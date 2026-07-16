@@ -415,8 +415,13 @@ export default function FournisseursPage() {
               {fournisseurs.map((fourn) => (
                 <TableRow key={fourn.id}>
                   <TableCell>
-                    <p className="font-medium text-sm">{fourn.name}</p>
-                    {fourn.phone && (
+                    <button
+                          onClick={() => navigate(`/fournisseurs/${fourn.id}/historique`)}
+                          className="font-medium text-sm text-orange-500 hover:underline text-left"
+                        >
+                          {fourn.name}
+                        </button>
+                          {fourn.phone && (
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <Phone className="h-3 w-3" />{fourn.phone}
                       </p>
