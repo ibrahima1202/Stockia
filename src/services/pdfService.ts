@@ -25,7 +25,6 @@ function getUnitPrefix(unitName?: string | null): string {
   return `${unitName.substring(0, 4)}.`
 }
 
-// Calcul affichage stock en conditionnements
 function formatStockDisplay(
   stockCurrent: number,
   baseUnit: string | undefined,
@@ -34,11 +33,9 @@ function formatStockDisplay(
   if (units.length === 0 || stockCurrent === 0) {
     return `${stockCurrent} ${baseUnit || 'Pcs'}`
   }
-
   const sortedUnits = [...units].sort((a, b) => b.conversion_rate - a.conversion_rate)
   let remaining = stockCurrent
   const parts: string[] = []
-
   for (const unit of sortedUnits) {
     if (remaining >= unit.conversion_rate) {
       const qty = Math.floor(remaining / unit.conversion_rate)
@@ -46,36 +43,29 @@ function formatStockDisplay(
       remaining = remaining % unit.conversion_rate
     }
   }
-
   if (remaining > 0) {
     parts.push(`${remaining} ${baseUnit || 'Pcs'}`)
   }
-
   return parts.join(' + ')
 }
 
 function addHeader(doc: jsPDF, businessName: string, title: string) {
   doc.setFillColor(...DARK_COLOR)
   doc.rect(0, 0, 210, 28, 'F')
-
   doc.setFontSize(16)
   doc.setTextColor(255, 255, 255)
   doc.setFont('helvetica', 'bold')
   doc.text('STOCK', 14, 17)
-
   doc.setTextColor(...STOCKAM_COLOR)
   doc.text('AM', 36, 17)
-
   doc.setFontSize(9)
   doc.setTextColor(148, 163, 184)
   doc.setFont('helvetica', 'normal')
   doc.text(businessName, 14, 23)
-
   doc.setFontSize(11)
   doc.setTextColor(255, 255, 255)
   doc.setFont('helvetica', 'bold')
   doc.text(title, 210 - 14, 17, { align: 'right' })
-
   doc.setFontSize(8)
   doc.setTextColor(148, 163, 184)
   doc.setFont('helvetica', 'normal')
@@ -104,23 +94,19 @@ export const pdfService = {
   exportSaleReceipt(sale: Sale, businessName: string): void {
     const doc = new jsPDF()
     addHeader(doc, businessName, 'REÇU DE VENTE')
-
     let y = 38
     doc.setFontSize(10)
     doc.setTextColor(...DARK_COLOR)
-
     doc.setFont('helvetica', 'bold')
     doc.text('Référence :', 14, y)
     doc.setFont('helvetica', 'normal')
     doc.text(sale.reference, 55, y)
     y += 7
-
     doc.setFont('helvetica', 'bold')
     doc.text('Date :', 14, y)
     doc.setFont('helvetica', 'normal')
     doc.text(format(new Date(sale.created_at), 'dd/MM/yyyy HH:mm', { locale: fr }), 55, y)
     y += 7
-
     if (sale.client) {
       doc.setFont('helvetica', 'bold')
       doc.text('Client :', 14, y)
@@ -128,14 +114,12 @@ export const pdfService = {
       doc.text(sale.client.name, 55, y)
       y += 7
     }
-
     doc.setFont('helvetica', 'bold')
     doc.text('Statut :', 14, y)
     doc.setFont('helvetica', 'normal')
     const statutLabel = sale.statut === 'paye' ? 'Payé' : sale.statut === 'credit' ? 'À crédit' : 'Partiel'
     doc.text(statutLabel, 55, y)
     y += 10
-
     autoTable(doc, {
       startY: y,
       head: [['Désignation', 'Qté', 'Remise', 'Prix unit.', 'Total']],
@@ -159,10 +143,7 @@ export const pdfService = {
         lineWidth: 0.3,
         lineColor: [255, 255, 255],
       },
-      bodyStyles: {
-        lineWidth: 0.3,
-        lineColor: [226, 232, 240],
-      },
+      bodyStyles: { lineWidth: 0.3, lineColor: [226, 232, 240] },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       styles: { fontSize: 9, cellPadding: 4 },
       columnStyles: {
@@ -175,9 +156,7 @@ export const pdfService = {
       tableLineWidth: 0.3,
       tableLineColor: [226, 232, 240],
     })
-
     let finalY = (doc as any).lastAutoTable.finalY + 6
-
     if ((sale.discount_amount ?? 0) > 0) {
       const subtotal = (sale.total_amount ?? 0) + (sale.discount_amount ?? 0)
       doc.setFontSize(9)
@@ -186,13 +165,11 @@ export const pdfService = {
       doc.text('Sous-total :', 125, finalY)
       doc.text(`${formatXOF(subtotal)} XOF`, 196, finalY, { align: 'right' })
       finalY += 6
-
       doc.setTextColor(249, 115, 22)
       doc.text('Remise facture :', 125, finalY)
       doc.text(`-${formatXOF(sale.discount_amount!)} XOF`, 196, finalY, { align: 'right' })
       finalY += 6
     }
-
     doc.setFillColor(249, 250, 251)
     doc.rect(120, finalY - 4, 76, 9, 'F')
     doc.setFontSize(11)
@@ -201,7 +178,6 @@ export const pdfService = {
     doc.text('TOTAL :', 125, finalY + 2)
     doc.setTextColor(...STOCKAM_COLOR)
     doc.text(`${formatXOF(sale.total_amount)} XOF`, 196, finalY + 2, { align: 'right' })
-
     if (sale.statut === 'partiel') {
       finalY += 8
       doc.setFontSize(9)
@@ -211,27 +187,178 @@ export const pdfService = {
       finalY += 6
       doc.text(`Reste dû : ${formatXOF(sale.total_amount - (sale.montant_paye ?? 0))} XOF`, 196, finalY, { align: 'right' })
     }
-
     finalY += 12
     doc.setFontSize(8)
     doc.setTextColor(148, 163, 184)
     doc.setFont('helvetica', 'italic')
     doc.text('Merci pour votre achat !', 105, finalY, { align: 'center' })
-
     addFooter(doc)
     doc.save(`recu-${sale.reference}.pdf`)
+  },
+
+  exportAchatReceipt(achat: {
+    reference: string
+    achat_date: string
+    montant_total: number
+    montant_paye: number
+    statut: string
+    notes?: string | null
+    fournisseur?: { name: string; phone?: string | null } | null
+    achat_items?: Array<{
+      quantity: number
+      unit_price: number
+      total_price: number
+      unit_name?: string | null
+      conversion_rate?: number | null
+      quantity_in_base?: number | null
+      product?: { name: string; reference: string; base_unit?: string | null } | null
+    }>
+  }, businessName: string): void {
+    const doc = new jsPDF()
+    addHeader(doc, businessName, 'FACTURE D\'ACHAT')
+
+    let y = 38
+    doc.setFontSize(10)
+    doc.setTextColor(...DARK_COLOR)
+
+    // Référence
+    doc.setFont('helvetica', 'bold')
+    doc.text('Référence :', 14, y)
+    doc.setFont('helvetica', 'normal')
+    doc.text(achat.reference, 55, y)
+    y += 7
+
+    // Date
+    doc.setFont('helvetica', 'bold')
+    doc.text('Date :', 14, y)
+    doc.setFont('helvetica', 'normal')
+    doc.text(format(new Date(achat.achat_date), 'dd/MM/yyyy', { locale: fr }), 55, y)
+    y += 7
+
+    // Fournisseur
+    if (achat.fournisseur) {
+      doc.setFont('helvetica', 'bold')
+      doc.text('Fournisseur :', 14, y)
+      doc.setFont('helvetica', 'normal')
+      doc.text(achat.fournisseur.name, 55, y)
+      y += 7
+      if (achat.fournisseur.phone) {
+        doc.setFont('helvetica', 'bold')
+        doc.text('Téléphone :', 14, y)
+        doc.setFont('helvetica', 'normal')
+        doc.text(achat.fournisseur.phone, 55, y)
+        y += 7
+      }
+    }
+
+    // Statut
+    doc.setFont('helvetica', 'bold')
+    doc.text('Statut :', 14, y)
+    doc.setFont('helvetica', 'normal')
+    const statutLabel = achat.statut === 'comptant' ? 'Payé comptant'
+      : achat.statut === 'credit' ? 'À crédit'
+      : 'Paiement partiel'
+    doc.text(statutLabel, 55, y)
+    y += 10
+
+    // Tableau articles
+    autoTable(doc, {
+      startY: y,
+      head: [['Désignation', 'Qté', 'Unité', 'Prix unit.', 'Total']],
+      body: (achat.achat_items || []).map((item) => {
+        const prefix = getUnitPrefix(item.unit_name)
+        const designation = prefix
+          ? `${prefix} ${item.product?.name ?? '—'}`
+          : item.product?.name ?? '—'
+        const convRate = item.conversion_rate ?? 1
+        const qtyDisplay = convRate > 1 && item.unit_name
+          ? `${item.quantity} ${item.unit_name}`
+          : `${item.quantity}`
+        const unitLabel = item.unit_name && convRate > 1
+          ? `${item.unit_name} (${item.quantity_in_base ?? item.quantity * convRate} ${item.product?.base_unit || 'pcs'})`
+          : item.product?.base_unit || 'Pcs'
+        return [
+          designation,
+          qtyDisplay,
+          unitLabel,
+          `${formatXOF(item.unit_price)} XOF`,
+          `${formatXOF(item.total_price)} XOF`,
+        ]
+      }),
+      headStyles: {
+        fillColor: DARK_COLOR,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        lineWidth: 0.3,
+        lineColor: [255, 255, 255],
+      },
+      bodyStyles: { lineWidth: 0.3, lineColor: [226, 232, 240] },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      styles: { fontSize: 9, cellPadding: 4 },
+      columnStyles: {
+        0: { cellWidth: 60 },
+        1: { halign: 'center' },
+        2: { halign: 'center' },
+        3: { halign: 'right' },
+        4: { halign: 'right', fontStyle: 'bold' },
+      },
+      tableLineWidth: 0.3,
+      tableLineColor: [226, 232, 240],
+    })
+
+    let finalY = (doc as any).lastAutoTable.finalY + 6
+
+    // Total
+    doc.setFillColor(249, 250, 251)
+    doc.rect(120, finalY - 4, 76, 9, 'F')
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...DARK_COLOR)
+    doc.text('TOTAL :', 125, finalY + 2)
+    doc.setTextColor(...STOCKAM_COLOR)
+    doc.text(`${formatXOF(achat.montant_total)} XOF`, 196, finalY + 2, { align: 'right' })
+
+    // Paiement partiel
+    if (achat.statut === 'partiel') {
+      finalY += 8
+      doc.setFontSize(9)
+      doc.setTextColor(239, 68, 68)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`Montant payé : ${formatXOF(achat.montant_paye)} XOF`, 196, finalY, { align: 'right' })
+      finalY += 6
+      doc.text(`Reste dû : ${formatXOF(achat.montant_total - achat.montant_paye)} XOF`, 196, finalY, { align: 'right' })
+    }
+
+    // Crédit total
+    if (achat.statut === 'credit') {
+      finalY += 8
+      doc.setFontSize(9)
+      doc.setTextColor(239, 68, 68)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`Montant dû : ${formatXOF(achat.montant_total)} XOF`, 196, finalY, { align: 'right' })
+    }
+
+    // Notes
+    if (achat.notes) {
+      finalY += 10
+      doc.setFontSize(8)
+      doc.setTextColor(100, 116, 139)
+      doc.setFont('helvetica', 'italic')
+      doc.text(`Notes : ${achat.notes}`, 14, finalY)
+    }
+
+    addFooter(doc)
+    doc.save(`achat-${achat.reference}.pdf`)
   },
 
   exportJournal(entries: JournalEntry[], businessName: string, period?: string): void {
     const doc = new jsPDF()
     addHeader(doc, businessName, 'LIVRE JOURNAL')
-
     if (period) {
       doc.setFontSize(9)
       doc.setTextColor(100, 116, 139)
       doc.text(`Période : ${period}`, 14, 35)
     }
-
     autoTable(doc, {
       startY: period ? 40 : 35,
       head: [['Date', 'Référence', 'Libellé', 'Débit', 'Crédit', 'Solde']],
@@ -250,10 +377,7 @@ export const pdfService = {
         lineWidth: 0.3,
         lineColor: [255, 255, 255],
       },
-      bodyStyles: {
-        lineWidth: 0.3,
-        lineColor: [226, 232, 240],
-      },
+      bodyStyles: { lineWidth: 0.3, lineColor: [226, 232, 240] },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       styles: { fontSize: 8, cellPadding: 4 },
       columnStyles: {
@@ -264,17 +388,14 @@ export const pdfService = {
       tableLineWidth: 0.3,
       tableLineColor: [226, 232, 240],
     })
-
     const totalDebit = entries.reduce((s, e) => s + e.debit, 0)
     const totalCredit = entries.reduce((s, e) => s + e.credit, 0)
     const finalY = (doc as any).lastAutoTable.finalY + 6
-
     doc.setFontSize(9)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...DARK_COLOR)
     doc.text(`Total débits : ${formatXOF(totalDebit)} XOF`, 14, finalY)
     doc.text(`Total crédits : ${formatXOF(totalCredit)} XOF`, 105, finalY)
-
     addFooter(doc)
     doc.save(`journal-${format(new Date(), 'yyyy-MM-dd')}.pdf`)
   },
@@ -286,7 +407,6 @@ export const pdfService = {
   ): void {
     const doc = new jsPDF()
     addHeader(doc, businessName, 'RAPPORT DE STOCK')
-
     const lowStock = products.filter((p) => p.stock_current <= p.stock_minimum)
     doc.setFontSize(9)
     doc.setTextColor(100, 116, 139)
@@ -294,7 +414,6 @@ export const pdfService = {
       `${products.length} produit(s) — ${lowStock.length} en rupture ou stock faible`,
       14, 35
     )
-
     autoTable(doc, {
       startY: 40,
       head: [['Référence', 'Produit', 'Catégorie', 'Stock', 'Min.', 'Prix achat/u', 'Valeur stock']],
@@ -318,10 +437,7 @@ export const pdfService = {
         lineWidth: 0.3,
         lineColor: [255, 255, 255],
       },
-      bodyStyles: {
-        lineWidth: 0.3,
-        lineColor: [226, 232, 240],
-      },
+      bodyStyles: { lineWidth: 0.3, lineColor: [226, 232, 240] },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       styles: { fontSize: 8, cellPadding: 4 },
       columnStyles: {
@@ -342,7 +458,6 @@ export const pdfService = {
         }
       },
     })
-
     const totalValue = products.reduce((s, p) => s + p.stock_current * p.purchase_price, 0)
     const finalY = (doc as any).lastAutoTable.finalY + 6
     doc.setFontSize(10)
@@ -351,7 +466,6 @@ export const pdfService = {
     doc.text('Valeur totale du stock :', 120, finalY)
     doc.setTextColor(...STOCKAM_COLOR)
     doc.text(`${formatXOF(totalValue)} XOF`, 196, finalY, { align: 'right' })
-
     addFooter(doc)
     doc.save(`stock-${format(new Date(), 'yyyy-MM-dd')}.pdf`)
   },
