@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Phone, MapPin, Wallet, XCircle, Pencil, ShoppingBag, Minus, Trash2, Lock, Crown } from 'lucide-react'
+import { Plus, Phone, MapPin, Wallet, XCircle, Pencil, ShoppingBag, Minus, Trash2, Lock, Crown, FileDown } from 'lucide-react'
 import {
   LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   Badge, EmptyState, Card
@@ -15,9 +15,9 @@ import { useCommerceType } from '@/hooks/useCommerceType'
 import { useProductUnits } from '@/hooks/useProductUnits'
 import { useNavigate } from 'react-router-dom'
 import { formatCurrency } from '@/lib/utils'
+import { pdfService } from '@/services/pdfService'
 import type { Fournisseur, PaymentMethod, AchatCartItem, AchatStatut, ProductUnit } from '@/types'
 
-// Composant sélecteur d'unité d'achat
 function AchatUnitSelector({
   productId,
   baseUnit,
@@ -72,7 +72,7 @@ export default function FournisseursPage() {
   } = useFournisseurs()
   const { products, reload: reloadProducts } = useProducts()
   const { categories, createCategory } = useCategories()
-  const { canAccessClientsAndFournisseurs, isLoading: subLoading } = useSubscription()
+  const { canAccessClientsAndFournisseurs, isLoading: subLoading, business } = useSubscription()
   const { canViewFournisseurs, canManageFournisseurs, canManageAchats } = useRole()
   const { isGrosDetail } = useCommerceType()
   const navigate = useNavigate()
@@ -94,6 +94,10 @@ export default function FournisseursPage() {
   const [achatUnitPrice, setAchatUnitPrice] = useState('')
   const [selectedAchatUnit, setSelectedAchatUnit] = useState<ProductUnit | null>(null)
   const [selectedConversionRate, setSelectedConversionRate] = useState(1)
+
+  // Dernier achat pour génération PDF
+  const [dernierAchat, setDernierAchat] = useState<any>(null)
+  const [showAchatSuccess, setShowAchatSuccess] = useState(false)
 
   const [showNewProduct, setShowNewProduct] = useState(false)
   const [newProductData, setNewProductData] = useState({
@@ -120,8 +124,6 @@ export default function FournisseursPage() {
 
   const activeProducts = useMemo(() => products.filter((p) => p.is_active), [products])
   const selectedProduct = products.find((p) => p.id === selectedProductId)
-
-  // Quantité en unité de base calculée automatiquement
   const quantiteEnBase = achatQty * selectedConversionRate
 
   const openCreate = () => {
@@ -169,14 +171,14 @@ export default function FournisseursPage() {
     setAchatUnitPrice('')
     setSelectedAchatUnit(null)
     setSelectedConversionRate(1)
+    setDernierAchat(null)
+    setShowAchatSuccess(false)
   }
 
   const addToAchatCart = () => {
     const product = products.find((p) => p.id === selectedProductId)
     if (!product || !achatUnitPrice || achatQty < 1) return
     const unitPrice = parseFloat(achatUnitPrice)
-
-    // Quantité en unité de base
     const qtyInBase = achatQty * selectedConversionRate
 
     setAchatCart((prev) => {
@@ -186,11 +188,7 @@ export default function FournisseursPage() {
         return prev.map((i) => {
           if (`${i.product.id}-${(i as any).unit_id ?? 'base'}` !== key) return i
           const newQty = i.quantity + achatQty
-          return {
-            ...i,
-            quantity: newQty,
-            total_price: newQty * i.unit_price,
-          }
+          return { ...i, quantity: newQty, total_price: newQty * i.unit_price }
         })
       }
       return [...prev, {
@@ -198,7 +196,6 @@ export default function FournisseursPage() {
         quantity: achatQty,
         unit_price: unitPrice,
         total_price: achatQty * unitPrice,
-        // Infos unité
         unit_id: selectedAchatUnit?.id ?? null,
         unit_name: selectedAchatUnit?.unit_name ?? (product.base_unit || 'Pièce'),
         conversion_rate: selectedConversionRate,
@@ -221,12 +218,7 @@ export default function FournisseursPage() {
     setAchatCart((prev) => prev.map((i) => {
       if (i.product.id !== productId) return i
       const convRate = (i as any).conversion_rate ?? 1
-      return {
-        ...i,
-        quantity: newQty,
-        total_price: newQty * i.unit_price,
-        quantity_in_base: newQty * convRate,
-      }
+      return { ...i, quantity: newQty, total_price: newQty * i.unit_price, quantity_in_base: newQty * convRate }
     }))
   }
 
@@ -235,7 +227,7 @@ export default function FournisseursPage() {
     if (achatStatut === 'partiel' && (!achatMontantPaye || parseFloat(achatMontantPaye) <= 0)) return
     setAchatSubmitting(true)
     try {
-      await addAchat({
+      const achat = await addAchat({
         fournisseur_id: achatFourn.id,
         items: achatCart,
         statut: achatStatut,
@@ -243,12 +235,37 @@ export default function FournisseursPage() {
         payment_method: achatPaymentMethod,
         notes: achatNotes,
       })
-      setAchatFourn(null)
+
+      // Préparer les données pour le PDF
+      setDernierAchat({
+        ...achat,
+        fournisseur: achatFourn,
+        achat_items: achatCart.map((item) => ({
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total_price: item.total_price,
+          unit_name: (item as any).unit_name ?? null,
+          conversion_rate: (item as any).conversion_rate ?? 1,
+          quantity_in_base: (item as any).quantity_in_base ?? item.quantity,
+          product: {
+            name: item.product.name,
+            reference: item.product.reference,
+            base_unit: item.product.base_unit ?? null,
+          },
+        })),
+      })
+
+      setShowAchatSuccess(true)
       reloadProducts()
     } catch {
     } finally {
       setAchatSubmitting(false)
     }
+  }
+
+  const handleExportAchat = () => {
+    if (!dernierAchat) return
+    pdfService.exportAchatReceipt(dernierAchat, business?.name ?? 'Mon Commerce')
   }
 
   const handleCreateProduct = async () => {
@@ -479,12 +496,11 @@ export default function FournisseursPage() {
       )}
 
       {/* Modal achat */}
-      {achatFourn && canManageAchats && (
+      {achatFourn && canManageAchats && !showAchatSuccess && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-2">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 space-y-4">
             <h2 className="font-semibold text-lg">Facture d'achat — {achatFourn.name}</h2>
 
-            {/* Ajout produit */}
             <Card className="p-3 space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">Ajouter un produit</p>
@@ -510,7 +526,6 @@ export default function FournisseursPage() {
                 ))}
               </select>
 
-              {/* Sélecteur unité d'achat pour gros & détail */}
               {selectedProductId && isGrosDetail && (
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-slate-600">Unité d'achat</label>
@@ -556,7 +571,6 @@ export default function FournisseursPage() {
                 </div>
               </div>
 
-              {/* Affichage conversion automatique */}
               {selectedProductId && isGrosDetail && selectedConversionRate > 1 && achatQty > 0 && (
                 <div className="bg-orange-50 border border-orange-200 rounded-md px-3 py-2">
                   <p className="text-xs text-orange-700 font-medium">
@@ -567,7 +581,6 @@ export default function FournisseursPage() {
               )}
             </Card>
 
-            {/* Tableau panier */}
             {achatCart.length > 0 && (
               <div className="border rounded-lg overflow-hidden">
                 <Table>
@@ -627,7 +640,6 @@ export default function FournisseursPage() {
               </div>
             )}
 
-            {/* Mode règlement */}
             <div className="space-y-3">
               <Select
                 label="Mode de règlement"
@@ -677,6 +689,54 @@ export default function FournisseursPage() {
                 Valider la facture
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal succès achat avec option PDF */}
+      {showAchatSuccess && dernierAchat && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4 text-center">
+            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
+              <ShoppingBag className="h-8 w-8 text-emerald-500" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900">Achat enregistré !</h2>
+            <p className="text-sm text-slate-500">
+              La facture <strong className="font-mono">{dernierAchat.reference}</strong> a été enregistrée avec succès. Le stock a été mis à jour automatiquement.
+            </p>
+
+            <div className="bg-slate-50 rounded-lg px-4 py-3 text-left space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Fournisseur</span>
+                <span className="font-medium">{dernierAchat.fournisseur?.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total</span>
+                <span className="font-bold text-orange-500">{formatCurrency(dernierAchat.montant_total)} XOF</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Statut</span>
+                <span className={`font-medium ${dernierAchat.statut === 'comptant' ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {dernierAchat.statut === 'comptant' ? 'Payé comptant' : dernierAchat.statut === 'credit' ? 'À crédit' : 'Partiel'}
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={handleExportAchat}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold text-sm transition-colors"
+            >
+              <FileDown className="h-5 w-5" />
+              Télécharger la facture PDF
+            </button>
+
+            <Button variant="outline" className="w-full" onClick={() => {
+              setShowAchatSuccess(false)
+              setAchatFourn(null)
+              setDernierAchat(null)
+            }}>
+              Fermer
+            </Button>
           </div>
         </div>
       )}
