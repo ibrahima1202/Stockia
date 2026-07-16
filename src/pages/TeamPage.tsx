@@ -1,13 +1,12 @@
 import { useState } from 'react'
-import { Users, Shield, UserCheck, UserX, Plus, Eye, EyeOff } from 'lucide-react'
+import { Users, Shield, UserCheck, UserX, Plus, Eye, EyeOff, Trash2 } from 'lucide-react'
 import { LoadingScreen, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge, EmptyState, Card } from '@/components/ui/index'
 import { Button } from '@/components/ui/button'
 import { useTeam } from '@/hooks/useTeam'
 import { useAuthStore } from '@/store/authStore'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useToast } from '@/store/toastStore'
-import type { UserRole } from '@/types'
-
+import type { Profile, UserRole } from '@/types'
 const ROLES: { value: UserRole; label: string; description: string }[] = [
   { value: 'admin', label: 'Admin', description: 'Accès complet à toutes les fonctionnalités' },
   { value: 'gerant', label: 'Gérant', description: 'Accès complet sauf gestion d\'équipe et abonnement' },
@@ -15,7 +14,6 @@ const ROLES: { value: UserRole; label: string; description: string }[] = [
   { value: 'magasinier', label: 'Magasinier', description: 'Gestion des produits et du stock uniquement' },
   { value: 'promoteur', label: 'Promoteur', description: 'Lecture seule de toutes les sections' },
 ]
-
 const getRoleBadgeVariant = (role: string) => {
   if (role === 'admin') return 'info'
   if (role === 'gerant') return 'info'
@@ -23,43 +21,39 @@ const getRoleBadgeVariant = (role: string) => {
   if (role === 'magasinier') return 'warning'
   return 'default'
 }
-
 const getRoleLabel = (role: string) => {
   return ROLES.find((r) => r.value === role)?.label ?? role
 }
-
 export default function TeamPage() {
-  const { members, isLoading, updateRole, toggleActive, createMember } = useTeam()
+  const { members, isLoading, updateRole, toggleActive, createMember, deleteMember } = useTeam()
   const { profile: currentProfile } = useAuthStore()
   const { subscription } = useSubscription()
   const toast = useToast()
-
   const activeMembers = members.filter((m) => m.is_active !== false)
   const maxUsers = subscription?.plan?.max_users
   const limitReached = maxUsers !== null && maxUsers !== undefined && activeMembers.length >= maxUsers
-
+  const isCurrentUserAdmin = currentProfile?.role === 'admin'
   // Modal création membre
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState({
-    fullName: '', email: '', password: '', role: 'caissier' as UserRole
+    fullName: '', phone: '', password: '', role: 'caissier' as UserRole
   })
   const [showPassword, setShowPassword] = useState(false)
   const [formSubmitting, setFormSubmitting] = useState(false)
-
   // Modal changement de rôle
   const [editingRole, setEditingRole] = useState<{ userId: string; currentRole: string } | null>(null)
   const [newRole, setNewRole] = useState<UserRole>('caissier')
   const [roleSubmitting, setRoleSubmitting] = useState(false)
-
-  const handleToggleActive = async (userId: string, isActive: boolean) => {
+  // Modal suppression définitive
+  const [deletingMember, setDeletingMember] = useState<Profile | null>(null)
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
+const handleToggleActive = async (userId: string, isActive: boolean) => {
     await toggleActive(userId, !isActive)
   }
-
   const openRoleEdit = (userId: string, currentRole: string) => {
     setEditingRole({ userId, currentRole })
     setNewRole(currentRole as UserRole)
   }
-
   const handleRoleUpdate = async () => {
     if (!editingRole) return
     setRoleSubmitting(true)
@@ -73,19 +67,22 @@ export default function TeamPage() {
       setRoleSubmitting(false)
     }
   }
-
   const openCreate = () => {
     if (limitReached) {
       toast.error('Limite atteinte', `Votre plan permet ${maxUsers} utilisateur(s) maximum. Passez à un plan supérieur pour en ajouter d'autres.`)
       return
     }
-    setFormData({ fullName: '', email: '', password: '', role: 'caissier' })
+    setFormData({ fullName: '', phone: '', password: '', role: 'caissier' })
     setShowForm(true)
   }
-
   const handleSubmit = async () => {
-    if (!formData.fullName.trim() || !formData.email.trim() || !formData.password) {
+    if (!formData.fullName.trim() || !formData.phone.trim() || !formData.password) {
       toast.error('Erreur', 'Tous les champs sont obligatoires')
+      return
+    }
+    const digitsOnly = formData.phone.replace(/[^0-9]/g, '')
+    if (digitsOnly.length < 8) {
+      toast.error('Erreur', 'Numéro de téléphone invalide')
       return
     }
     if (formData.password.length < 6) {
@@ -103,9 +100,20 @@ export default function TeamPage() {
       setFormSubmitting(false)
     }
   }
-
-  if (isLoading) return <LoadingScreen text="Chargement de l'équipe..." />
-
+  const handleConfirmDelete = async () => {
+    if (!deletingMember) return
+    setDeleteSubmitting(true)
+    try {
+      await deleteMember(deletingMember.id)
+      setDeletingMember(null)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erreur lors de la suppression'
+      toast.error('Erreur', msg)
+    } finally {
+      setDeleteSubmitting(false)
+    }
+  }
+if (isLoading) return <LoadingScreen text="Chargement de l'équipe..." />
   return (
     <div className="space-y-5">
       <div className="page-header">
@@ -120,7 +128,6 @@ export default function TeamPage() {
           <Plus className="h-4 w-4" /> Ajouter un membre
         </Button>
       </div>
-
       {/* Description des rôles */}
       <Card className="p-4 space-y-2">
         <p className="text-sm font-semibold text-slate-700">Rôles disponibles</p>
@@ -133,7 +140,6 @@ export default function TeamPage() {
           ))}
         </div>
       </Card>
-
       {limitReached && (
         <Card className="p-4 bg-orange-50 border-orange-200">
           <p className="text-sm text-orange-700">
@@ -141,7 +147,6 @@ export default function TeamPage() {
           </p>
         </Card>
       )}
-
       <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
         {members.length === 0 ? (
           <EmptyState icon={Users} title="Aucun membre" description="Votre équipe apparaîtra ici" />
@@ -166,6 +171,9 @@ export default function TeamPage() {
                         {member.full_name}
                         {isMe && <span className="text-xs text-muted-foreground ml-1">(vous)</span>}
                       </p>
+                      {member.phone && (
+                        <p className="text-xs text-muted-foreground">{member.phone}</p>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant={getRoleBadgeVariant(member.role)}>
@@ -194,6 +202,15 @@ export default function TeamPage() {
                           >
                             {isActive ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
                           </button>
+                          {isCurrentUserAdmin && (
+                            <button
+                              onClick={() => setDeletingMember(member)}
+                              className="p-1.5 rounded hover:bg-red-50 text-red-600"
+                              title="Supprimer définitivement"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       )}
                     </TableCell>
@@ -204,7 +221,6 @@ export default function TeamPage() {
           </Table>
         )}
       </div>
-
       {/* Modal changement de rôle */}
       {editingRole && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
@@ -220,8 +236,7 @@ export default function TeamPage() {
                       ? 'border-orange-500 bg-orange-50'
                       : 'border-slate-200 hover:border-slate-300'
                   }`}
-                >
-                  <div className="flex items-center gap-2">
+                ><div className="flex items-center gap-2">
                     <Badge variant={getRoleBadgeVariant(r.value)}>{r.label}</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">{r.description}</p>
@@ -239,7 +254,6 @@ export default function TeamPage() {
           </div>
         </div>
       )}
-
       {/* Modal création membre */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
@@ -257,13 +271,13 @@ export default function TeamPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Email *</label>
+                <label className="block text-sm font-medium mb-1">Numéro de téléphone *</label>
                 <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  placeholder="email@exemple.com"
+                  placeholder="Ex: 76 12 34 56"
                 />
               </div>
               <div>
@@ -294,8 +308,7 @@ export default function TeamPage() {
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
                   className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  {ROLES.map((r) => (
+                >{ROLES.map((r) => (
                     <option key={r.value} value={r.value}>{r.label} — {r.description}</option>
                   ))}
                 </select>
@@ -307,6 +320,36 @@ export default function TeamPage() {
               </Button>
               <Button className="flex-1" onClick={handleSubmit} isLoading={formSubmitting}>
                 Créer le compte
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal suppression définitive */}
+      {deletingMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 space-y-4">
+            <h2 className="font-semibold text-lg">Supprimer ce membre ?</h2>
+            <p className="text-sm text-muted-foreground">
+              Cette action est irréversible. Le compte de <strong>{deletingMember.full_name}</strong>
+              {deletingMember.phone ? ` (${deletingMember.phone})` : ''} sera définitivement supprimé
+              et il ne pourra plus se connecter.
+            </p>
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setDeletingMember(null)}
+                disabled={deleteSubmitting}
+              >
+                Annuler
+              </Button>
+              <Button
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                onClick={handleConfirmDelete}
+                isLoading={deleteSubmitting}
+              >
+                Supprimer
               </Button>
             </div>
           </div>
