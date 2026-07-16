@@ -19,6 +19,8 @@ import TeamPage from '@/pages/TeamPage'
 import AdminPage from '@/pages/AdminPage'
 import SetupPage from '@/pages/SetupPage'
 import ClientHistoriquePage from '@/pages/ClientHistoriquePage'
+import FournisseurHistoriquePage from '@/pages/FournisseurHistoriquePage'
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -45,13 +47,14 @@ export default function App() {
           <Route path="sales" element={<SalesPage />} />
           <Route path="journal" element={<JournalPage />} />
           <Route path="clients" element={<ClientsPage />} />
+          <Route path="clients/:id/historique" element={<ClientHistoriquePage />} />
           <Route path="fournisseurs" element={<FournisseursPage />} />
+          <Route path="fournisseurs/:id/historique" element={<FournisseurHistoriquePage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="subscription" element={<SubscriptionPage />} />
           <Route path="stats" element={<StatsPage />} />
           <Route path="team" element={<TeamPage />} />
           <Route path="expenses" element={<ExpensesPage />} />
-          <Route path="clients/:id/historique" element={<ClientHistoriquePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
