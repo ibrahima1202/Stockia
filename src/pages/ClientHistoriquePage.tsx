@@ -66,12 +66,6 @@ export default function ClientHistoriquePage() {
   const [deleteEntry, setDeleteEntry] = useState<ClientHistoriqueEntry | null>(null)
   const [deleteSubmitting, setDeleteSubmitting] = useState(false)
 
-  const loadHistorique = async () => {
-    if (!id) return
-    const h = await clientService.getHistorique(id)
-    setHistorique(h)
-  }
-
   const load = async () => {
     if (!id) return
     setIsLoading(true)
