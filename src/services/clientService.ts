@@ -104,11 +104,14 @@ export const clientService = {
       })
     }
 
-    // 2. Règlements
+    // 2. Règlements réels uniquement (sale_id IS NULL — exclut les lignes
+    // de traçage "Crédit vente" créées automatiquement par saleService.create,
+    // qui ne sont PAS de vrais paiements reçus et ne doivent pas apparaître ici)
     const { data: reglements } = await supabase
       .from('reglements_clients')
       .select('*')
       .eq('client_id', clientId)
+      .is('sale_id', null)
       .gt('montant', 0)
       .order('reglement_date', { ascending: false })
 
@@ -123,11 +126,12 @@ export const clientService = {
       })
     }
 
-    // 3. Prêts
+    // 3. Prêts (également sale_id IS NULL par construction)
     const { data: pretsAlt } = await supabase
       .from('reglements_clients')
       .select('*')
       .eq('client_id', clientId)
+      .is('sale_id', null)
       .lt('montant', 0)
       .order('reglement_date', { ascending: false })
 
@@ -196,7 +200,7 @@ export const clientService = {
       .eq('id', clientId)
     if (uError) throw uError
 
-    // 4. Entrée journal avec le nom du client
+    // 4. Entrée journal avec le nom du client, liée par source_id
     const reference = generateReference('RCL')
     const { error: jError } = await supabase.from('journal_entries').insert({
       entry_date: new Date().toISOString().split('T')[0],
@@ -211,5 +215,174 @@ export const clientService = {
     if (jError) throw jError
 
     return reglement
+  },
+
+  async addPret(
+    clientId: string,
+    clientName: string,
+    montant: number,
+    notes: string,
+    userId: string
+  ): Promise<ReglementClient> {
+    const businessId = getBusinessId()
+    const reference = generateReference('PRE')
+    const today = new Date().toISOString().split('T')[0]
+
+    // 1. Enregistrer le prêt comme un règlement à montant négatif
+    const { data: pret, error: rError } = await supabase
+      .from('reglements_clients')
+      .insert({
+        client_id: clientId,
+        sale_id: null,
+        montant: -montant,
+        payment_method: 'especes',
+        notes: `Prêt espèces — ${reference}${notes ? ` — ${notes}` : ''}`,
+        reglement_date: today,
+        created_by: userId,
+        business_id: businessId,
+      })
+      .select()
+      .single()
+    if (rError) throw rError
+
+    // 2. Mettre à jour le solde du client
+    const { data: clientData, error: cError } = await supabase
+      .from('clients')
+      .select('solde')
+      .eq('id', clientId)
+      .single()
+    if (cError) throw cError
+
+    const { error: uError } = await supabase
+      .from('clients')
+      .update({ solde: clientData.solde + montant })
+      .eq('id', clientId)
+    if (uError) throw uError
+
+    // 3. Entrée journal liée par source_id (permet suppression/mise à jour propre)
+    const { error: jError } = await supabase.from('journal_entries').insert({
+      entry_date: today,
+      reference,
+      label: `Prêt espèces — ${clientName}${notes ? ` (${notes})` : ''}`,
+      debit: 0,
+      credit: montant,
+      source_type: 'pret_client',
+      source_id: pret.id,
+      business_id: businessId,
+    })
+    if (jError) throw jError
+
+    return pret
+  },
+
+  /**
+   * Supprime un règlement ou un prêt (jamais une vente — celles-ci se gèrent
+   * depuis la page Ventes pour rester synchronisées avec le stock).
+   * Recalcule le solde client et supprime l'écriture journal liée.
+   */
+  async deleteOperation(
+    entryId: string,
+    entryType: 'reglement' | 'pret',
+    clientId: string
+  ): Promise<void> {
+    // 1. Récupérer la ligne réelle pour connaître le montant signé exact
+    const { data: row, error: fetchError } = await supabase
+      .from('reglements_clients')
+      .select('montant')
+      .eq('id', entryId)
+      .single()
+    if (fetchError) throw fetchError
+
+    // 2. Recalculer le solde client (annule l'effet initial de la ligne)
+    const { data: clientData, error: cError } = await supabase
+      .from('clients')
+      .select('solde')
+      .eq('id', clientId)
+      .single()
+    if (cError) throw cError
+
+    const newSolde = Math.max(0, clientData.solde + row.montant)
+    const { error: uError } = await supabase
+      .from('clients')
+      .update({ solde: newSolde })
+      .eq('id', clientId)
+    if (uError) throw uError
+
+    // 3. Supprimer l'écriture journal liée (source_id = id de la ligne)
+    const sourceType = entryType === 'reglement' ? 'reglement_client' : 'pret_client'
+    await supabase
+      .from('journal_entries')
+      .delete()
+      .eq('source_type', sourceType)
+      .eq('source_id', entryId)
+
+    // 4. Supprimer la ligne règlement/prêt
+    const { error: dError } = await supabase
+      .from('reglements_clients')
+      .delete()
+      .eq('id', entryId)
+    if (dError) throw dError
+  },
+
+  /**
+   * Met à jour le montant et/ou les notes d'un règlement ou d'un prêt.
+   * Recalcule le solde client par delta et synchronise l'écriture journal liée.
+   */
+  async updateOperation(
+    entryId: string,
+    entryType: 'reglement' | 'pret',
+    clientId: string,
+    clientName: string,
+    newMontant: number,
+    newNotes: string
+  ): Promise<void> {
+    const { data: row, error: fetchError } = await supabase
+      .from('reglements_clients')
+      .select('montant')
+      .eq('id', entryId)
+      .single()
+    if (fetchError) throw fetchError
+
+    const oldSigned = row.montant
+    const newSigned = entryType === 'reglement' ? newMontant : -newMontant
+
+    // 1. Ajuster le solde client par le delta entre ancien et nouveau montant
+    const { data: clientData, error: cError } = await supabase
+      .from('clients')
+      .select('solde')
+      .eq('id', clientId)
+      .single()
+    if (cError) throw cError
+
+    const delta = newSigned - oldSigned
+    const newSolde = Math.max(0, clientData.solde - delta)
+    const { error: uError } = await supabase
+      .from('clients')
+      .update({ solde: newSolde })
+      .eq('id', clientId)
+    if (uError) throw uError
+
+    // 2. Mettre à jour la ligne règlement/prêt
+    const { error: rError } = await supabase
+      .from('reglements_clients')
+      .update({ montant: newSigned, notes: newNotes })
+      .eq('id', entryId)
+    if (rError) throw rError
+
+    // 3. Synchroniser l'écriture journal liée
+    const sourceType = entryType === 'reglement' ? 'reglement_client' : 'pret_client'
+    const label = entryType === 'reglement'
+      ? `Règlement — ${clientName}${newNotes ? ` (${newNotes})` : ''}`
+      : `Prêt espèces — ${clientName}${newNotes ? ` (${newNotes})` : ''}`
+
+    await supabase
+      .from('journal_entries')
+      .update({
+        debit: entryType === 'reglement' ? newMontant : 0,
+        credit: entryType === 'pret' ? newMontant : 0,
+        label,
+      })
+      .eq('source_type', sourceType)
+      .eq('source_id', entryId)
   },
 }
