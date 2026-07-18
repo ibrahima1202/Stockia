@@ -82,28 +82,31 @@ export default function ExpensesPage() {
 
   return (
     <div className="space-y-5">
-      <div className="page-header">
+      <div className="page-header flex-col items-start gap-3 sm:flex-row sm:items-center">
         <div>
           <h1 className="page-title">Dépenses</h1>
           <p className="text-sm text-muted-foreground">{expenses.length} dépense(s)</p>
         </div>
-        <Button onClick={() => { reset({ expense_date: format(new Date(), 'yyyy-MM-dd') }); setModalOpen(true) }}>
+        <Button
+          className="w-full sm:w-auto"
+          onClick={() => { reset({ expense_date: format(new Date(), 'yyyy-MM-dd') }); setModalOpen(true) }}
+        >
           <Plus className="h-4 w-4" /> Nouvelle dépense
         </Button>
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 xs:grid-cols-3 gap-3">
         {(['transport', 'loyer', 'divers'] as ExpenseCategory[]).map((cat) => {
           const total = expenses
             .filter((e) => e.category === cat)
             .reduce((s, e) => s + e.amount, 0)
           return (
-            <Card key={cat} className="p-4">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <Card key={cat} className="p-4 min-w-0">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide truncate">
                 {formatExpenseCategory(cat)}
               </p>
-              <p className="text-xl font-bold mt-1">{formatCurrency(total)}</p>
+              <p className="text-lg sm:text-xl font-bold mt-1 truncate">{formatCurrency(total)}</p>
             </Card>
           )
         })}
@@ -111,68 +114,107 @@ export default function ExpensesPage() {
 
       {/* Filters */}
       <Card className="p-4">
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="h-9 w-full sm:w-auto rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             <option value="">Toutes les catégories</option>
             <option value="transport">Transport</option>
             <option value="loyer">Loyer</option>
             <option value="divers">Divers</option>
           </select>
-          <div className="ml-auto text-sm font-medium flex items-center gap-1.5">
+          <div className="sm:ml-auto text-sm font-medium flex items-center gap-1.5">
             Total filtré :
             <span className="font-bold text-foreground">{formatCurrency(totalAmount)}</span>
           </div>
         </div>
       </Card>
 
-      {/* Table */}
-      <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
-        {filtered.length === 0 ? (
+      {/* Liste — cartes sur mobile, tableau sur desktop */}
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
           <EmptyState icon={Receipt} title="Aucune dépense" description="Enregistrez vos dépenses ici" />
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Catégorie</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Montant</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((expense) => (
-                <TableRow key={expense.id}>
-                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                    {formatDate(expense.expense_date)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={categoryVariants[expense.category]}>
-                      {formatExpenseCategory(expense.category)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm">{expense.description}</TableCell>
-                  <TableCell className="text-right font-semibold text-red-600">
-                    {formatCurrency(expense.amount)}
-                  </TableCell>
-                  <TableCell className="text-right">
+        </div>
+      ) : (
+        <>
+          {/* Mobile : cartes empilées */}
+          <div className="space-y-2 md:hidden">
+            {filtered.map((expense) => (
+              <div key={expense.id} className="bg-white rounded-lg border shadow-sm p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-900 break-words">
+                      {expense.description}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <Badge variant={categoryVariants[expense.category]}>
+                        {formatExpenseCategory(expense.category)}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDate(expense.expense_date)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <p className="text-sm font-bold text-red-600 whitespace-nowrap">
+                      {formatCurrency(expense.amount)}
+                    </p>
                     <button
                       onClick={() => setDeleteConfirm(expense.id)}
                       className="p-1.5 rounded hover:bg-red-50 transition-colors"
                     >
                       <Trash2 className="h-3.5 w-3.5 text-red-400" />
                     </button>
-                  </TableCell>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop : tableau */}
+          <div className="hidden md:block bg-white rounded-lg border shadow-sm overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Catégorie</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="text-right">Montant</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </div>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((expense) => (
+                  <TableRow key={expense.id}>
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                      {formatDate(expense.expense_date)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={categoryVariants[expense.category]}>
+                        {formatExpenseCategory(expense.category)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm">{expense.description}</TableCell>
+                    <TableCell className="text-right font-semibold text-red-600">
+                      {formatCurrency(expense.amount)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <button
+                        onClick={() => setDeleteConfirm(expense.id)}
+                        className="p-1.5 rounded hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
+      )}
 
       {/* Create Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nouvelle dépense" size="md">
