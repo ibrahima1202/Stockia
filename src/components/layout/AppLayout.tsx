@@ -136,6 +136,42 @@ export function AppLayout() {
         </div>
       </main>
 
+      {/* Calque invisible pour fermer le menu "Plus" au clic en dehors (pas d'assombrissement) */}
+      {showMore && moreItems.length > 0 && (
+        <div className="lg:hidden fixed inset-0 z-30" onClick={() => setShowMore(false)} />
+      )}
+
+      {/* Panneau "Plus de fonctions" — intégré au-dessus de la barre de nav, sans overlay sombre */}
+      {showMore && moreItems.length > 0 && (
+        <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] px-4 pt-3 pb-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold tracking-wide text-slate-400">PLUS DE FONCTIONS</p>
+            <button onClick={() => setShowMore(false)} className="p-1 rounded-md hover:bg-muted text-slate-400">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex items-start justify-between gap-2 overflow-x-auto">
+            {moreItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onClick={() => setShowMore(false)}
+                className={({ isActive }) =>
+                  `flex flex-col items-center gap-1 shrink-0 w-16 py-1 transition-colors ${
+                    isActive ? 'text-orange-500' : 'text-slate-600 hover:text-slate-900'
+                  }`
+                }
+              >
+                <div className="w-11 h-11 rounded-xl bg-slate-50 flex items-center justify-center">
+                  <item.icon className="h-5 w-5" />
+                </div>
+                <span className="text-[11px] font-medium text-center leading-tight">{item.label}</span>
+              </NavLink>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Bottom nav mobile */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 px-2 h-16 flex items-center justify-around">
         {bottomNavItems.map((item) => (
@@ -143,6 +179,7 @@ export function AppLayout() {
             key={item.to}
             to={item.to}
             end={item.to === '/'}
+            onClick={() => setShowMore(false)}
             className={({ isActive }) =>
               `flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-colors ${
                 isActive ? 'text-orange-500' : 'text-slate-500 hover:text-slate-700'
@@ -156,46 +193,16 @@ export function AppLayout() {
 
         {moreItems.length > 0 && (
           <button
-            onClick={() => setShowMore(true)}
-            className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-slate-500 hover:text-slate-700 transition-colors"
+            onClick={() => setShowMore((prev) => !prev)}
+            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-colors ${
+              showMore ? 'text-orange-500' : 'text-slate-500 hover:text-slate-700'
+            }`}
           >
             <MoreHorizontal className="h-5 w-5" />
             <span className="text-[10px] font-medium">Plus</span>
           </button>
         )}
       </nav>
-
-      {/* Menu Plus */}
-      {showMore && (
-        <>
-          <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowMore(false)} />
-          <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl p-4 pb-8">
-            <div className="flex items-center justify-between mb-4">
-              <p className="font-semibold text-slate-900">Menu</p>
-              <button onClick={() => setShowMore(false)} className="p-1.5 rounded-lg hover:bg-muted">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              {moreItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  onClick={() => setShowMore(false)}
-                  className={({ isActive }) =>
-                    `flex flex-col items-center gap-1.5 p-3 rounded-xl transition-colors ${
-                      isActive ? 'bg-orange-50 text-orange-500' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                    }`
-                  }
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span className="text-xs font-medium">{item.label}</span>
-                </NavLink>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
     </div>
   )
 }
