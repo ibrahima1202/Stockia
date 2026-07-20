@@ -547,6 +547,7 @@ export default function RegisterPage() {
                         Se connecter →
                       </Link>
                       <span className="text-slate-300">|</span>
+                      <a
                       
                         href="https://wa.me/22392347783?text=Bonjour, j'ai oublié mon mot de passe STOCKAM."
                         target="_blank"
