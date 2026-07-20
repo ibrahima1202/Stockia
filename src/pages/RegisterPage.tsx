@@ -1,13 +1,296 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Building2, User, Phone, MapPin, Check, Eye, EyeOff, Package, ShoppingBag } from 'lucide-react'
+import { Building2, User, Phone, MapPin, Check, Eye, EyeOff, Package, ShoppingBag, Search, ChevronDown } from 'lucide-react'
+import { isValidPhoneNumber } from 'libphonenumber-js'
 import { supabase } from '@/lib/supabase'
 import { useSubscription } from '@/hooks/useSubscription'
 
 const STEPS = ['Compte', 'Commerce']
 
-const phoneToEmail = (phone: string): string => {
-  const digits = phone.replace(/\D/g, '')
+// Convertit un code ISO2 (ex: "ML") en emoji drapeau
+function flagEmoji(iso2: string): string {
+  return iso2
+    .toUpperCase()
+    .replace(/./g, (char) => String.fromCodePoint(127397 + char.charCodeAt(0)))
+}
+
+interface Country {
+  name: string
+  iso2: string
+  dial: string
+}
+
+// Mali en premier (par défaut), puis liste alphabétique des autres pays
+const COUNTRIES: Country[] = [
+  { name: 'Mali', iso2: 'ML', dial: '223' },
+  { name: 'Afghanistan', iso2: 'AF', dial: '93' },
+  { name: 'Afrique du Sud', iso2: 'ZA', dial: '27' },
+  { name: 'Albanie', iso2: 'AL', dial: '355' },
+  { name: 'Algérie', iso2: 'DZ', dial: '213' },
+  { name: 'Allemagne', iso2: 'DE', dial: '49' },
+  { name: 'Andorre', iso2: 'AD', dial: '376' },
+  { name: 'Angola', iso2: 'AO', dial: '244' },
+  { name: 'Arabie saoudite', iso2: 'SA', dial: '966' },
+  { name: 'Argentine', iso2: 'AR', dial: '54' },
+  { name: 'Arménie', iso2: 'AM', dial: '374' },
+  { name: 'Australie', iso2: 'AU', dial: '61' },
+  { name: 'Autriche', iso2: 'AT', dial: '43' },
+  { name: 'Azerbaïdjan', iso2: 'AZ', dial: '994' },
+  { name: 'Bahamas', iso2: 'BS', dial: '1242' },
+  { name: 'Bahreïn', iso2: 'BH', dial: '973' },
+  { name: 'Bangladesh', iso2: 'BD', dial: '880' },
+  { name: 'Barbade', iso2: 'BB', dial: '1246' },
+  { name: 'Belgique', iso2: 'BE', dial: '32' },
+  { name: 'Belize', iso2: 'BZ', dial: '501' },
+  { name: 'Bénin', iso2: 'BJ', dial: '229' },
+  { name: 'Bhoutan', iso2: 'BT', dial: '975' },
+  { name: 'Biélorussie', iso2: 'BY', dial: '375' },
+  { name: 'Birmanie (Myanmar)', iso2: 'MM', dial: '95' },
+  { name: 'Bolivie', iso2: 'BO', dial: '591' },
+  { name: 'Bosnie-Herzégovine', iso2: 'BA', dial: '387' },
+  { name: 'Botswana', iso2: 'BW', dial: '267' },
+  { name: 'Brésil', iso2: 'BR', dial: '55' },
+  { name: 'Brunei', iso2: 'BN', dial: '673' },
+  { name: 'Bulgarie', iso2: 'BG', dial: '359' },
+  { name: 'Burkina Faso', iso2: 'BF', dial: '226' },
+  { name: 'Burundi', iso2: 'BI', dial: '257' },
+  { name: 'Cambodge', iso2: 'KH', dial: '855' },
+  { name: 'Cameroun', iso2: 'CM', dial: '237' },
+  { name: 'Canada', iso2: 'CA', dial: '1' },
+  { name: 'Cap-Vert', iso2: 'CV', dial: '238' },
+  { name: 'Chili', iso2: 'CL', dial: '56' },
+  { name: 'Chine', iso2: 'CN', dial: '86' },
+  { name: 'Chypre', iso2: 'CY', dial: '357' },
+  { name: 'Colombie', iso2: 'CO', dial: '57' },
+  { name: 'Comores', iso2: 'KM', dial: '269' },
+  { name: 'Congo-Brazzaville', iso2: 'CG', dial: '242' },
+  { name: 'Congo-Kinshasa (RDC)', iso2: 'CD', dial: '243' },
+  { name: 'Corée du Nord', iso2: 'KP', dial: '850' },
+  { name: 'Corée du Sud', iso2: 'KR', dial: '82' },
+  { name: 'Costa Rica', iso2: 'CR', dial: '506' },
+  { name: "Côte d'Ivoire", iso2: 'CI', dial: '225' },
+  { name: 'Croatie', iso2: 'HR', dial: '385' },
+  { name: 'Cuba', iso2: 'CU', dial: '53' },
+  { name: 'Danemark', iso2: 'DK', dial: '45' },
+  { name: 'Djibouti', iso2: 'DJ', dial: '253' },
+  { name: 'Dominique', iso2: 'DM', dial: '1767' },
+  { name: 'Égypte', iso2: 'EG', dial: '20' },
+  { name: 'Émirats arabes unis', iso2: 'AE', dial: '971' },
+  { name: 'Équateur', iso2: 'EC', dial: '593' },
+  { name: 'Érythrée', iso2: 'ER', dial: '291' },
+  { name: 'Espagne', iso2: 'ES', dial: '34' },
+  { name: 'Estonie', iso2: 'EE', dial: '372' },
+  { name: 'Eswatini', iso2: 'SZ', dial: '268' },
+  { name: 'États-Unis', iso2: 'US', dial: '1' },
+  { name: 'Éthiopie', iso2: 'ET', dial: '251' },
+  { name: 'Fidji', iso2: 'FJ', dial: '679' },
+  { name: 'Finlande', iso2: 'FI', dial: '358' },
+  { name: 'France', iso2: 'FR', dial: '33' },
+  { name: 'Gabon', iso2: 'GA', dial: '241' },
+  { name: 'Gambie', iso2: 'GM', dial: '220' },
+  { name: 'Géorgie', iso2: 'GE', dial: '995' },
+  { name: 'Ghana', iso2: 'GH', dial: '233' },
+  { name: 'Grèce', iso2: 'GR', dial: '30' },
+  { name: 'Grenade', iso2: 'GD', dial: '1473' },
+  { name: 'Guatemala', iso2: 'GT', dial: '502' },
+  { name: 'Guinée', iso2: 'GN', dial: '224' },
+  { name: 'Guinée-Bissau', iso2: 'GW', dial: '245' },
+  { name: 'Guinée équatoriale', iso2: 'GQ', dial: '240' },
+  { name: 'Guyana', iso2: 'GY', dial: '592' },
+  { name: 'Haïti', iso2: 'HT', dial: '509' },
+  { name: 'Honduras', iso2: 'HN', dial: '504' },
+  { name: 'Hongrie', iso2: 'HU', dial: '36' },
+  { name: 'Inde', iso2: 'IN', dial: '91' },
+  { name: 'Indonésie', iso2: 'ID', dial: '62' },
+  { name: 'Irak', iso2: 'IQ', dial: '964' },
+  { name: 'Iran', iso2: 'IR', dial: '98' },
+  { name: 'Irlande', iso2: 'IE', dial: '353' },
+  { name: 'Islande', iso2: 'IS', dial: '354' },
+  { name: 'Israël', iso2: 'IL', dial: '972' },
+  { name: 'Italie', iso2: 'IT', dial: '39' },
+  { name: 'Jamaïque', iso2: 'JM', dial: '1876' },
+  { name: 'Japon', iso2: 'JP', dial: '81' },
+  { name: 'Jordanie', iso2: 'JO', dial: '962' },
+  { name: 'Kazakhstan', iso2: 'KZ', dial: '7' },
+  { name: 'Kenya', iso2: 'KE', dial: '254' },
+  { name: 'Kirghizistan', iso2: 'KG', dial: '996' },
+  { name: 'Kiribati', iso2: 'KI', dial: '686' },
+  { name: 'Koweït', iso2: 'KW', dial: '965' },
+  { name: 'Laos', iso2: 'LA', dial: '856' },
+  { name: 'Lesotho', iso2: 'LS', dial: '266' },
+  { name: 'Lettonie', iso2: 'LV', dial: '371' },
+  { name: 'Liban', iso2: 'LB', dial: '961' },
+  { name: 'Liberia', iso2: 'LR', dial: '231' },
+  { name: 'Libye', iso2: 'LY', dial: '218' },
+  { name: 'Liechtenstein', iso2: 'LI', dial: '423' },
+  { name: 'Lituanie', iso2: 'LT', dial: '370' },
+  { name: 'Luxembourg', iso2: 'LU', dial: '352' },
+  { name: 'Macédoine du Nord', iso2: 'MK', dial: '389' },
+  { name: 'Madagascar', iso2: 'MG', dial: '261' },
+  { name: 'Malaisie', iso2: 'MY', dial: '60' },
+  { name: 'Malawi', iso2: 'MW', dial: '265' },
+  { name: 'Maldives', iso2: 'MV', dial: '960' },
+  { name: 'Malte', iso2: 'MT', dial: '356' },
+  { name: 'Maroc', iso2: 'MA', dial: '212' },
+  { name: 'Maurice', iso2: 'MU', dial: '230' },
+  { name: 'Mauritanie', iso2: 'MR', dial: '222' },
+  { name: 'Mexique', iso2: 'MX', dial: '52' },
+  { name: 'Moldavie', iso2: 'MD', dial: '373' },
+  { name: 'Monaco', iso2: 'MC', dial: '377' },
+  { name: 'Mongolie', iso2: 'MN', dial: '976' },
+  { name: 'Monténégro', iso2: 'ME', dial: '382' },
+  { name: 'Mozambique', iso2: 'MZ', dial: '258' },
+  { name: 'Namibie', iso2: 'NA', dial: '264' },
+  { name: 'Népal', iso2: 'NP', dial: '977' },
+  { name: 'Nicaragua', iso2: 'NI', dial: '505' },
+  { name: 'Niger', iso2: 'NE', dial: '227' },
+  { name: 'Nigeria', iso2: 'NG', dial: '234' },
+  { name: 'Norvège', iso2: 'NO', dial: '47' },
+  { name: 'Nouvelle-Zélande', iso2: 'NZ', dial: '64' },
+  { name: 'Oman', iso2: 'OM', dial: '968' },
+  { name: 'Ouganda', iso2: 'UG', dial: '256' },
+  { name: 'Ouzbékistan', iso2: 'UZ', dial: '998' },
+  { name: 'Pakistan', iso2: 'PK', dial: '92' },
+  { name: 'Panama', iso2: 'PA', dial: '507' },
+  { name: 'Papouasie-Nouvelle-Guinée', iso2: 'PG', dial: '675' },
+  { name: 'Paraguay', iso2: 'PY', dial: '595' },
+  { name: 'Pays-Bas', iso2: 'NL', dial: '31' },
+  { name: 'Pérou', iso2: 'PE', dial: '51' },
+  { name: 'Philippines', iso2: 'PH', dial: '63' },
+  { name: 'Pologne', iso2: 'PL', dial: '48' },
+  { name: 'Portugal', iso2: 'PT', dial: '351' },
+  { name: 'Qatar', iso2: 'QA', dial: '974' },
+  { name: 'République centrafricaine', iso2: 'CF', dial: '236' },
+  { name: 'République dominicaine', iso2: 'DO', dial: '1809' },
+  { name: 'République tchèque', iso2: 'CZ', dial: '420' },
+  { name: 'Roumanie', iso2: 'RO', dial: '40' },
+  { name: 'Royaume-Uni', iso2: 'GB', dial: '44' },
+  { name: 'Russie', iso2: 'RU', dial: '7' },
+  { name: 'Rwanda', iso2: 'RW', dial: '250' },
+  { name: 'Saint-Marin', iso2: 'SM', dial: '378' },
+  { name: 'Sao Tomé-et-Principe', iso2: 'ST', dial: '239' },
+  { name: 'Sénégal', iso2: 'SN', dial: '221' },
+  { name: 'Serbie', iso2: 'RS', dial: '381' },
+  { name: 'Seychelles', iso2: 'SC', dial: '248' },
+  { name: 'Sierra Leone', iso2: 'SL', dial: '232' },
+  { name: 'Singapour', iso2: 'SG', dial: '65' },
+  { name: 'Slovaquie', iso2: 'SK', dial: '421' },
+  { name: 'Slovénie', iso2: 'SI', dial: '386' },
+  { name: 'Somalie', iso2: 'SO', dial: '252' },
+  { name: 'Soudan', iso2: 'SD', dial: '249' },
+  { name: 'Soudan du Sud', iso2: 'SS', dial: '211' },
+  { name: 'Sri Lanka', iso2: 'LK', dial: '94' },
+  { name: 'Suède', iso2: 'SE', dial: '46' },
+  { name: 'Suisse', iso2: 'CH', dial: '41' },
+  { name: 'Suriname', iso2: 'SR', dial: '597' },
+  { name: 'Syrie', iso2: 'SY', dial: '963' },
+  { name: 'Tadjikistan', iso2: 'TJ', dial: '992' },
+  { name: 'Tanzanie', iso2: 'TZ', dial: '255' },
+  { name: 'Tchad', iso2: 'TD', dial: '235' },
+  { name: 'Thaïlande', iso2: 'TH', dial: '66' },
+  { name: 'Timor oriental', iso2: 'TL', dial: '670' },
+  { name: 'Togo', iso2: 'TG', dial: '228' },
+  { name: 'Tonga', iso2: 'TO', dial: '676' },
+  { name: 'Trinité-et-Tobago', iso2: 'TT', dial: '1868' },
+  { name: 'Tunisie', iso2: 'TN', dial: '216' },
+  { name: 'Turkménistan', iso2: 'TM', dial: '993' },
+  { name: 'Turquie', iso2: 'TR', dial: '90' },
+  { name: 'Ukraine', iso2: 'UA', dial: '380' },
+  { name: 'Uruguay', iso2: 'UY', dial: '598' },
+  { name: 'Vanuatu', iso2: 'VU', dial: '678' },
+  { name: 'Vatican', iso2: 'VA', dial: '379' },
+  { name: 'Venezuela', iso2: 'VE', dial: '58' },
+  { name: 'Vietnam', iso2: 'VN', dial: '84' },
+  { name: 'Yémen', iso2: 'YE', dial: '967' },
+  { name: 'Zambie', iso2: 'ZM', dial: '260' },
+  { name: 'Zimbabwe', iso2: 'ZW', dial: '263' },
+]
+
+function CountryCodeSelect({
+  value,
+  onChange,
+}: {
+  value: Country
+  onChange: (c: Country) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setSearch('')
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const filtered = COUNTRIES.filter(
+    (c) =>
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.dial.includes(search.replace('+', ''))
+  )
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="h-9 flex items-center gap-1 rounded-md border border-input bg-background px-2 text-sm hover:bg-slate-50"
+      >
+        <span>{flagEmoji(value.iso2)}</span>
+        <span className="font-medium">+{value.dial}</span>
+        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+      </button>
+
+      {open && (
+        <div className="absolute z-30 mt-1 w-64 bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden">
+          <div className="p-2 border-b relative">
+            <Search className="absolute left-4 top-4.5 h-3.5 w-3.5 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher un pays..."
+              autoFocus
+              className="w-full h-8 rounded border border-input bg-background pl-7 pr-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="px-3 py-2.5 text-xs text-muted-foreground">Aucun pays trouvé</p>
+            ) : (
+              filtered.map((c) => (
+                <button
+                  key={c.iso2}
+                  type="button"
+                  onClick={() => {
+                    onChange(c)
+                    setOpen(false)
+                    setSearch('')
+                  }}
+                  className={`w-full flex items-center gap-2 text-left px-3 py-2 text-xs hover:bg-orange-50 transition-colors ${
+                    c.iso2 === value.iso2 ? 'bg-orange-50 font-medium' : ''
+                  }`}
+                >
+                  <span>{flagEmoji(c.iso2)}</span>
+                  <span className="flex-1 truncate">{c.name}</span>
+                  <span className="text-slate-400">+{c.dial}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const phoneToEmail = (fullPhone: string): string => {
+  const digits = fullPhone.replace(/\D/g, '')
   return `${digits}@stockam.app`
 }
 
@@ -21,6 +304,7 @@ export default function RegisterPage() {
 
   // Étape 1 — Compte
   const [fullName, setFullName] = useState('')
+  const [country, setCountry] = useState<Country>(COUNTRIES[0]) // Mali par défaut
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -33,13 +317,22 @@ export default function RegisterPage() {
   const [businessCity, setBusinessCity] = useState('')
   const [commerceType, setCommerceType] = useState<'detail' | 'gros_detail'>('detail')
 
+  // Numéro complet avec indicatif (ex: "22379740816")
+  const fullPhone = `${country.dial}${phone.replace(/\D/g, '')}`
+
   const handleStep1 = () => {
     if (!fullName.trim()) {
       setError('Le nom complet est obligatoire')
       return
     }
-    if (!phone.trim() || phone.replace(/\D/g, '').length < 8) {
-      setError('Veuillez saisir un numéro de téléphone valide')
+    if (!phone.trim()) {
+      setError('Veuillez saisir un numéro de téléphone')
+      return
+    }
+    // Validation stricte du format selon le pays choisi (via libphonenumber-js)
+    const isValid = isValidPhoneNumber(`+${fullPhone}`, country.iso2 as any)
+    if (!isValid) {
+      setError(`Ce numéro ne correspond pas au format attendu pour ${country.name}`)
       return
     }
     if (!password) {
@@ -66,14 +359,14 @@ export default function RegisterPage() {
     setError('')
     setIsLoading(true)
     try {
-      // Convertir le numéro en email fictif
-      const email = phoneToEmail(phone)
+      // Convertir le numéro (avec indicatif) en email fictif
+      const email = phoneToEmail(fullPhone)
 
       const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { full_name: fullName, role: 'admin', phone }
+          data: { full_name: fullName, role: 'admin', phone: `+${fullPhone}` }
         }
       })
       if (authError) throw authError
@@ -85,7 +378,7 @@ export default function RegisterPage() {
       await createBusiness(
         {
           name: businessName,
-          phone: businessPhone || phone,
+          phone: businessPhone || `+${fullPhone}`,
           city: businessCity,
           commerce_type: commerceType,
         },
@@ -183,18 +476,21 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                {/* Numéro de téléphone */}
+                {/* Numéro de téléphone avec indicatif pays */}
                 <div>
                   <label className="block text-sm font-medium mb-1">Numéro de téléphone *</label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="w-full h-9 rounded-md border border-input bg-background pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      placeholder="Ex: 79740816"
-                    />
+                  <div className="flex gap-2">
+                    <CountryCodeSelect value={country} onChange={setCountry} />
+                    <div className="relative flex-1">
+                      <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="w-full h-9 rounded-md border border-input bg-background pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        placeholder="Ex: 79740816"
+                      />
+                    </div>
                   </div>
                   <p className="text-xs text-slate-400 mt-1">
                     Ce numéro sera utilisé pour vous connecter
@@ -251,7 +547,7 @@ export default function RegisterPage() {
                         Se connecter →
                       </Link>
                       <span className="text-slate-300">|</span>
-                      <a
+                      
                         href="https://wa.me/22392347783?text=Bonjour, j'ai oublié mon mot de passe STOCKAM."
                         target="_blank"
                         rel="noreferrer"
@@ -410,4 +706,4 @@ export default function RegisterPage() {
       </p>
     </div>
   )
-                                                             }
+}
