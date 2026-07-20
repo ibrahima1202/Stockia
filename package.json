@@ -26,6 +26,7 @@
     "date-fns": "^3.3.1",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
+    "libphonenumber-js": "^1.11.9",
     "lucide-react": "^0.323.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -53,6 +54,5 @@
     "vite": "^5.1.0",
     "vite-plugin-pwa": "^0.19.0",
     "workbox-window": "^7.0.0"
-    
   }
 }
