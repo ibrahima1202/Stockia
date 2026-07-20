@@ -88,12 +88,19 @@ export default function SalesPage() {
   const [productSearch, setProductSearch] = useState('')
   const [showProductDropdown, setShowProductDropdown] = useState(false)
 
+  // Prix de vente personnalisé (ponctuel, avant ajout au panier)
+  const [customPrice, setCustomPrice] = useState<string>('')
+
   const [discountType, setDiscountType] = useState<DiscountType>('amount')
   const [discountValue, setDiscountValue] = useState('')
   const [showDiscount, setShowDiscount] = useState(false)
 
   const [editingDiscountId, setEditingDiscountId] = useState<string | null>(null)
   const [productDiscountValue, setProductDiscountValue] = useState('')
+
+  // Modification du prix d'une ligne déjà présente dans le panier
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null)
+  const [editPriceValue, setEditPriceValue] = useState('')
 
   const [showNewClient, setShowNewClient] = useState(false)
   const [newClientName, setNewClientName] = useState('')
@@ -120,6 +127,14 @@ export default function SalesPage() {
   }, [activeProducts, productSearch])
 
   const selectedProduct = products.find((p) => p.id === selectedProductId)
+
+  // Prix de base pour le produit/unité actuellement sélectionné
+  const defaultUnitPrice = selectedUnit ? selectedUnit.selling_price : (selectedProduct?.selling_price ?? 0)
+  const parsedCustomPrice = customPrice !== '' ? parseFloat(customPrice) : NaN
+  const hasValidCustomPrice = !isNaN(parsedCustomPrice) && parsedCustomPrice >= 0
+  const effectiveUnitPrice = hasValidCustomPrice ? parsedCustomPrice : defaultUnitPrice
+  const isPriceModified = hasValidCustomPrice && parsedCustomPrice !== defaultUnitPrice
+
   const subtotal = cart.reduce((sum, item) => sum + item.total_price, 0)
 
   const discountAmount = useMemo(() => {
@@ -141,6 +156,7 @@ export default function SalesPage() {
     setProductSearch(product.name)
     setShowProductDropdown(false)
     setSelectedUnit(null)
+    setCustomPrice('')
   }
 
   const addToCart = () => {
@@ -156,7 +172,8 @@ export default function SalesPage() {
       return
     }
 
-    const unitPrice = selectedUnit ? selectedUnit.selling_price : product.selling_price
+    const defaultPrice = selectedUnit ? selectedUnit.selling_price : product.selling_price
+    const unitPrice = hasValidCustomPrice ? parsedCustomPrice : defaultPrice
 
     setCart((prev) => {
       const key = `${product.id}-${selectedUnit?.id ?? 'base'}`
@@ -164,9 +181,11 @@ export default function SalesPage() {
       if (existing) {
         const newQty = existing.quantity + qty
         const newQtyInBase = newQty * conversionRate
+        // Si un nouveau prix personnalisé est saisi, il s'applique à toute la ligne fusionnée
+        const mergedUnitPrice = hasValidCustomPrice ? unitPrice : existing.unit_price
         return prev.map((i) =>
           `${i.product.id}-${i.unit_id ?? 'base'}` === key
-            ? { ...i, quantity: newQty, quantity_in_base: newQtyInBase, total_price: newQty * unitPrice - i.discount_amount }
+            ? { ...i, quantity: newQty, quantity_in_base: newQtyInBase, unit_price: mergedUnitPrice, total_price: newQty * mergedUnitPrice - i.discount_amount }
             : i
         )
       }
@@ -186,6 +205,7 @@ export default function SalesPage() {
     setProductSearch('')
     setQty(1)
     setSelectedUnit(null)
+    setCustomPrice('')
   }
 
   const updateQty = (productId: string, unitId: string | null | undefined, newQty: number) => {
@@ -218,6 +238,20 @@ export default function SalesPage() {
     }))
     setEditingDiscountId(null)
     setProductDiscountValue('')
+  }
+
+  // Modification du prix de vente d'une ligne déjà dans le panier (ponctuel, cette vente uniquement)
+  const applyPriceEdit = (productId: string, unitId: string | null | undefined) => {
+    const val = parseFloat(editPriceValue)
+    if (isNaN(val) || val < 0) return
+    const key = `${productId}-${unitId ?? 'base'}`
+    setCart((prev) => prev.map((i) => {
+      if (`${i.product.id}-${i.unit_id ?? 'base'}` !== key) return i
+      const newTotal = i.quantity * val - i.discount_amount
+      return { ...i, unit_price: val, total_price: Math.max(0, newTotal) }
+    }))
+    setEditingPriceId(null)
+    setEditPriceValue('')
   }
 
   const handleCreateClient = async () => {
@@ -561,6 +595,21 @@ export default function SalesPage() {
                   disabled={isReadOnly}
                   className="w-20 h-9 rounded-md border border-input bg-background px-3 text-sm text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
                 />
+
+                {/* Champ prix de vente (ponctuel, modifiable pour cette vente) */}
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={customPrice}
+                  onChange={(e) => setCustomPrice(e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                  disabled={isReadOnly || !selectedProductId}
+                  placeholder={selectedProduct ? String(defaultUnitPrice) : 'Prix'}
+                  title="Prix de vente pour cette vente (le prix de base du produit n'est pas modifié)"
+                  className="w-24 h-9 rounded-md border border-input bg-background px-2 text-sm text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+                />
+
                 <Button onClick={addToCart} disabled={!selectedProductId || isReadOnly || qty <= 0}>
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -569,13 +618,16 @@ export default function SalesPage() {
               {selectedProduct && isGrosDetail && (
                 <UnitSelector
                   product={selectedProduct}
-                  onSelect={(unit) => setSelectedUnit(unit)}
+                  onSelect={(unit) => { setSelectedUnit(unit); setCustomPrice('') }}
                 />
               )}
 
               {selectedProduct && (
                 <p className="text-xs text-emerald-600 mt-2">
-                  ✓ {selectedProduct.name} — {formatCurrency(selectedUnit ? selectedUnit.selling_price : selectedProduct.selling_price)}
+                  ✓ {selectedProduct.name} — {formatCurrency(effectiveUnitPrice)}
+                  {isPriceModified && (
+                    <span className="text-orange-500 font-medium"> (prix modifié, base: {formatCurrency(defaultUnitPrice)})</span>
+                  )}
                   {selectedUnit ? ` (${selectedUnit.unit_name})` : ` (${selectedProduct.base_unit || 'Pièce'})`}
                   · Stock: {selectedProduct.stock_current} {selectedProduct.base_unit || 'pcs'}
                 </p>
@@ -621,7 +673,38 @@ export default function SalesPage() {
                                 )}
                               </TableCell>
                             )}
-                            <TableCell className="text-right text-sm">{formatCurrency(item.unit_price)}</TableCell>
+                            <TableCell className="text-right text-sm">
+                              {editingPriceId === key ? (
+                                <div className="flex items-center gap-1 justify-end">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={editPriceValue}
+                                    onChange={(e) => setEditPriceValue(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') applyPriceEdit(item.product.id, item.unit_id) }}
+                                    className="w-20 h-7 rounded border border-input px-2 text-xs text-right"
+                                    placeholder="0"
+                                    autoFocus
+                                  />
+                                  <button onClick={() => applyPriceEdit(item.product.id, item.unit_id)} className="text-xs text-emerald-600 font-medium hover:underline">OK</button>
+                                  <button onClick={() => { setEditingPriceId(null); setEditPriceValue('') }} className="text-xs text-muted-foreground hover:underline">✕</button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    if (isReadOnly) return
+                                    setEditingDiscountId(null)
+                                    setEditingPriceId(key)
+                                    setEditPriceValue(item.unit_price.toString())
+                                  }}
+                                  disabled={isReadOnly}
+                                  title="Modifier le prix pour cette vente"
+                                  className="underline decoration-dashed decoration-slate-300 underline-offset-2 hover:text-orange-500 hover:decoration-orange-400 disabled:opacity-60 disabled:no-underline"
+                                >
+                                  {formatCurrency(item.unit_price)}
+                                </button>
+                              )}
+                            </TableCell>
                             <TableCell>
                               <div className="flex items-center justify-center gap-1">
                                 <button onClick={() => updateQty(item.product.id, item.unit_id, item.quantity - 0.5)} disabled={isReadOnly} className="h-6 w-6 rounded border flex items-center justify-center hover:bg-muted disabled:opacity-30">
@@ -643,7 +726,7 @@ export default function SalesPage() {
                                   </div>
                                 ) : (
                                   <button
-                                    onClick={() => { setEditingDiscountId(key); setProductDiscountValue(item.discount_amount > 0 ? item.discount_amount.toString() : '') }}
+                                    onClick={() => { setEditingPriceId(null); setEditingDiscountId(key); setProductDiscountValue(item.discount_amount > 0 ? item.discount_amount.toString() : '') }}
                                     className={`text-xs ${item.discount_amount > 0 ? 'text-orange-500 font-medium' : 'text-muted-foreground hover:text-orange-500'}`}
                                   >
                                     {item.discount_amount > 0 ? `-${formatCurrency(item.discount_amount)}` : '+ Remise'}
@@ -774,4 +857,4 @@ export default function SalesPage() {
       )}
     </div>
   )
-  }
+}
