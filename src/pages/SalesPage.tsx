@@ -181,7 +181,6 @@ export default function SalesPage() {
       if (existing) {
         const newQty = existing.quantity + qty
         const newQtyInBase = newQty * conversionRate
-        // Si un nouveau prix personnalisé est saisi, il s'applique à toute la ligne fusionnée
         const mergedUnitPrice = hasValidCustomPrice ? unitPrice : existing.unit_price
         return prev.map((i) =>
           `${i.product.id}-${i.unit_id ?? 'base'}` === key
@@ -416,6 +415,7 @@ export default function SalesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead></TableHead>
                   <TableHead>Référence</TableHead>
                   <TableHead>Client</TableHead>
                   <TableHead>Statut</TableHead>
@@ -426,6 +426,15 @@ export default function SalesPage() {
               <TableBody>
                 {sales.map((sale) => (
                   <TableRow key={sale.id}>
+                    <TableCell>
+                      {canExport ? (
+                        <button onClick={() => handleExportReceipt(sale)} className="p-1.5 hover:bg-orange-50 rounded text-orange-500" title="Télécharger le reçu PDF">
+                          <FileDown className="h-4 w-4" />
+                        </button>
+                      ) : (
+                        <span className="inline-block w-4 h-4" />
+                      )}
+                    </TableCell>
                     <TableCell>
                       <p className="font-mono text-xs">{sale.reference}</p>
                       <p className="text-xs text-muted-foreground">{formatDateTime(sale.created_at)}</p>
@@ -453,11 +462,6 @@ export default function SalesPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 justify-end">
-                        {canExport && (
-                          <button onClick={() => handleExportReceipt(sale)} className="p-1.5 hover:bg-orange-50 rounded text-orange-500" title="Reçu PDF">
-                            <FileDown className="h-3.5 w-3.5" />
-                          </button>
-                        )}
                         <button onClick={() => openEditModal(sale)} disabled={isReadOnly} className="p-1.5 hover:bg-blue-50 rounded text-blue-500 disabled:opacity-30">
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
