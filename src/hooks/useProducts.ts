@@ -77,14 +77,17 @@ export function useProducts() {
       setProducts(prods)
       setCategories(cats)
       setIsOfflineData(false)
+      setIsLoading(false)
 
-      // Mise en cache silencieuse pour consultation hors ligne (Étape 1)
+      // Mise en cache en arrière-plan — ne bloque pas l'affichage (Étape 1)
       try {
         const businessId = getBusinessId()
         const cacheEntries = prods.map((p) => toCachedProduct(p, businessId))
-        await db.products.bulkPut(cacheEntries)
+        db.products.bulkPut(cacheEntries).catch(() => {
+          // Échec silencieux — non bloquant
+        })
       } catch {
-        // Pas de business_id disponible ou échec d'écriture cache — non bloquant
+        // Pas de business_id disponible — non bloquant
       }
     } catch {
       // Échec réseau probable — on tente de servir les données en cache local
@@ -92,7 +95,6 @@ export function useProducts() {
       if (!hasCachedData) {
         toast.error('Erreur', 'Impossible de charger les produits')
       }
-    } finally {
       setIsLoading(false)
     }
   }, [loadFromCache]) // eslint-disable-line react-hooks/exhaustive-deps
