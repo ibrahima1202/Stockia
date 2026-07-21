@@ -20,10 +20,12 @@ export function useRole() {
   const canViewProducts = true
   const canManageProducts = isAdminLike || isMagasinier
 
-  // Stock
+  // Stock — lecture pour le promoteur, gestion réservée aux autres rôles habituels
+  const canViewStock = isAdminLike || isMagasinier || isPromoteur
   const canManageStock = isAdminLike || isMagasinier
 
-  // Ventes
+  // Ventes — lecture pour le promoteur, actions réservées aux autres rôles habituels
+  const canViewSales = isAdminLike || isCaissier || isPromoteur
   const canManageSales = isAdminLike || isCaissier
   const canCreateSale = isAdminLike || isCaissier
   const canCancelSale = isAdminLike || isCaissier
@@ -41,7 +43,8 @@ export function useRole() {
   // Achats fournisseurs
   const canManageAchats = isAdminLike || isCaissier
 
-  // Dépenses
+  // Dépenses — lecture pour le promoteur, gestion réservée aux autres rôles habituels
+  const canViewExpenses = isAdminLike || isCaissier || isPromoteur
   const canManageExpenses = isAdminLike || isCaissier
 
   // Journal
@@ -69,7 +72,9 @@ export function useRole() {
     canViewDashboard,
     canViewProducts,
     canManageProducts,
+    canViewStock,
     canManageStock,
+    canViewSales,
     canManageSales,
     canCreateSale,
     canCancelSale,
@@ -80,6 +85,7 @@ export function useRole() {
     canViewFournisseurs,
     canManageFournisseurs,
     canManageAchats,
+    canViewExpenses,
     canManageExpenses,
     canViewJournal,
     canViewStats,
