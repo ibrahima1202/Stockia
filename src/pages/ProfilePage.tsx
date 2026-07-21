@@ -1,17 +1,20 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User, Building2, Trash2, Crown, Calendar, ChevronRight, Pencil, Package, ShoppingBag } from 'lucide-react'
+import { User, Building2, Trash2, Crown, Calendar, ChevronRight, Pencil, Package, ShoppingBag, Lock, Eye, EyeOff } from 'lucide-react'
 import { Card } from '@/components/ui/index'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/store/authStore'
 import { useSubscription } from '@/hooks/useSubscription'
+import { useRole } from '@/hooks/useRole'
 import { profileService } from '@/services/profileService'
 import { subscriptionService } from '@/services/subscriptionService'
+import { supabase } from '@/lib/supabase'
 import { useToast } from '@/store/toastStore'
 
 export default function ProfilePage() {
   const { user, profile, setProfile } = useAuthStore()
   const { subscription, business, reload } = useSubscription()
+  const { isAdmin } = useRole()
   const toast = useToast()
   const navigate = useNavigate()
 
@@ -19,6 +22,15 @@ export default function ProfilePage() {
   const [editingProfile, setEditingProfile] = useState(false)
   const [fullName, setFullName] = useState(profile?.full_name ?? '')
   const [profileSubmitting, setProfileSubmitting] = useState(false)
+
+  // Mot de passe
+  const [editingPassword, setEditingPassword] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmNewPassword, setConfirmNewPassword] = useState('')
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false)
 
   // Commerce
   const [editingBusiness, setEditingBusiness] = useState(false)
@@ -44,6 +56,33 @@ export default function ProfilePage() {
       toast.error('Erreur', 'Impossible de mettre à jour le profil')
     } finally {
       setProfileSubmitting(false)
+    }
+  }
+
+  const handleUpdatePassword = async () => {
+    setPasswordError('')
+
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordError('Le mot de passe doit contenir au moins 6 caractères')
+      return
+    }
+    if (newPassword !== confirmNewPassword) {
+      setPasswordError('Les mots de passe ne correspondent pas')
+      return
+    }
+
+    setPasswordSubmitting(true)
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) throw error
+      toast.success('Mot de passe mis à jour')
+      setEditingPassword(false)
+      setNewPassword('')
+      setConfirmNewPassword('')
+    } catch {
+      setPasswordError('Impossible de mettre à jour le mot de passe. Réessayez.')
+    } finally {
+      setPasswordSubmitting(false)
     }
   }
 
@@ -202,6 +241,95 @@ export default function ProfilePage() {
         )}
       </Card>
 
+      {/* Mot de passe */}
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Lock className="h-4 w-4 text-slate-500" />
+            <h2 className="font-semibold text-sm">Mot de passe</h2>
+          </div>
+          {!editingPassword && (
+            <button
+              onClick={() => setEditingPassword(true)}
+              className="p-1.5 hover:bg-slate-100 rounded text-slate-500"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        {!editingPassword ? (
+          <p className="text-xs text-muted-foreground">
+            Changez votre mot de passe pour sécuriser votre compte.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">Nouveau mot de passe</label>
+              <div className="relative">
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 pr-9 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  placeholder="Min. 6 caractères"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Confirmer le nouveau mot de passe</label>
+              <div className="relative">
+                <input
+                  type={showConfirmNewPassword ? 'text' : 'password'}
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 pr-9 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  placeholder="Répétez le mot de passe"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showConfirmNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            {passwordError && (
+              <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                <p className="text-sm text-red-500">{passwordError}</p>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setEditingPassword(false)
+                  setNewPassword('')
+                  setConfirmNewPassword('')
+                  setPasswordError('')
+                }}
+              >
+                Annuler
+              </Button>
+              <Button onClick={handleUpdatePassword} isLoading={passwordSubmitting} size="sm">
+                Enregistrer
+              </Button>
+            </div>
+          </div>
+        )}
+      </Card>
+
       {/* Commerce */}
       {business && (
         <Card className="p-4 space-y-3">
@@ -344,36 +472,38 @@ export default function ProfilePage() {
         </Card>
       )}
 
-      {/* Nettoyage des données */}
-      <Card className="p-4 space-y-3 border-red-200">
-        <div className="flex items-center gap-2">
-          <Trash2 className="h-4 w-4 text-red-500" />
-          <h2 className="font-semibold text-sm text-red-600">Nettoyer les données de test</h2>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Supprime ventes, dépenses, mouvements, clients et fournisseurs. Produits conservés. Stocks remis à zéro.
-        </p>
-        {cleanConfirm && (
-          <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-            <p className="text-sm text-red-600 font-medium">⚠️ Êtes-vous sûr ? Action irréversible !</p>
+      {/* Nettoyage des données — réservé à l'admin */}
+      {isAdmin && (
+        <Card className="p-4 space-y-3 border-red-200">
+          <div className="flex items-center gap-2">
+            <Trash2 className="h-4 w-4 text-red-500" />
+            <h2 className="font-semibold text-sm text-red-600">Nettoyer les données de test</h2>
           </div>
-        )}
-        <div className="flex gap-2">
+          <p className="text-xs text-muted-foreground">
+            Supprime ventes, dépenses, mouvements, clients et fournisseurs. Produits conservés. Stocks remis à zéro.
+          </p>
           {cleanConfirm && (
-            <Button variant="outline" size="sm" onClick={() => setCleanConfirm(false)}>
-              Annuler
-            </Button>
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <p className="text-sm text-red-600 font-medium">⚠️ Êtes-vous sûr ? Action irréversible !</p>
+            </div>
           )}
-          <Button
-            size="sm"
-            className="bg-red-500 hover:bg-red-600 text-white"
-            onClick={handleCleanData}
-            isLoading={cleanSubmitting}
-          >
-            {cleanConfirm ? 'Confirmer la suppression' : 'Nettoyer les données'}
-          </Button>
-        </div>
-      </Card>
+          <div className="flex gap-2">
+            {cleanConfirm && (
+              <Button variant="outline" size="sm" onClick={() => setCleanConfirm(false)}>
+                Annuler
+              </Button>
+            )}
+            <Button
+              size="sm"
+              className="bg-red-500 hover:bg-red-600 text-white"
+              onClick={handleCleanData}
+              isLoading={cleanSubmitting}
+            >
+              {cleanConfirm ? 'Confirmer la suppression' : 'Nettoyer les données'}
+            </Button>
+          </div>
+        </Card>
+      )}
     </div>
   )
-}
+}                                                                                                                                                                     
