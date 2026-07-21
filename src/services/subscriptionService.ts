@@ -19,11 +19,31 @@ export const subscriptionService = {
   // SUBSCRIPTION
   // ============================================================
   async getMySubscription(): Promise<Subscription | null> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+
+    // Retrouver le commerce du profil connecté (owner OU membre d'équipe)
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('business_id')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (profileError || !profile?.business_id) return null
+
+    // Retrouver le owner_id réel du commerce (peut être différent de l'utilisateur connecté)
+    const { data: biz, error: bizError } = await supabase
+      .from('businesses')
+      .select('owner_id')
+      .eq('id', profile.business_id)
+      .maybeSingle()
+    if (bizError || !biz?.owner_id) return null
+
+    // L'abonnement est rattaché au owner_id du commerce
     const { data, error } = await supabase
       .from('subscriptions')
       .select('*, plan:plans(*)')
-      .eq('owner_id', (await supabase.auth.getUser()).data.user?.id ?? '')
-      .single()
+      .eq('owner_id', biz.owner_id)
+      .maybeSingle()
     if (error) return null
     return data
   },
@@ -95,11 +115,21 @@ export const subscriptionService = {
   // BUSINESS
   // ============================================================
   async getMyBusiness(): Promise<Business | null> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('business_id')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (profileError || !profile?.business_id) return null
+
     const { data, error } = await supabase
       .from('businesses')
       .select('*')
-      .eq('owner_id', (await supabase.auth.getUser()).data.user?.id ?? '')
-      .single()
+      .eq('id', profile.business_id)
+      .maybeSingle()
     if (error) return null
     return data
   },
