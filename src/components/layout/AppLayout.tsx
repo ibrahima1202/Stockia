@@ -11,6 +11,7 @@ import { useSubscription } from '@/hooks/useSubscription'
 import { useRole } from '@/hooks/useRole'
 import { SubscriptionBanner } from './SubscriptionBanner'
 import { Sidebar } from './Sidebar'
+import { OfflineIndicator } from './OfflineIndicator'
 
 export function AppLayout() {
   const { signOut } = useAuth()
@@ -52,6 +53,8 @@ export function AppLayout() {
     <div className="min-h-screen bg-background">
       {/* Sidebar desktop */}
       <Sidebar />
+
+      <OfflineIndicator />
 
       {/* Header mobile */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-slate-900 border-b border-slate-800 px-4 h-14 flex items-center justify-between">
