@@ -548,40 +548,40 @@ export default function SalesPage() {
           <div className="lg:col-span-2 space-y-4">
             <Card className="p-4">
               <h3 className="font-medium text-sm mb-3">Ajouter un produit</h3>
-              <div className="flex gap-2">
-                <div className="flex-1 relative">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                    <input
-                      type="text"
-                      value={productSearch}
-                      onChange={(e) => { setProductSearch(e.target.value); setSelectedProductId(''); setShowProductDropdown(true) }}
-                      onFocus={() => setShowProductDropdown(true)}
-                      disabled={isReadOnly}
-                      placeholder="Rechercher un produit..."
-                      className="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
-                    />
-                  </div>
-                  {showProductDropdown && (
-                    <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg max-h-64 overflow-y-auto">
-                      {filteredProducts.length === 0 ? (
-                        <p className="px-3 py-2.5 text-sm text-muted-foreground">Aucun produit trouvé</p>
-                      ) : (
-                        filteredProducts.map((p) => (
-                          <button key={p.id} type="button" onClick={() => selectProduct(p)} className="w-full text-left px-3 py-2.5 text-sm hover:bg-orange-50 transition-colors border-b last:border-b-0">
-                            <p className="font-medium text-slate-900">{p.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatCurrency(p.selling_price)} · Stock: {p.stock_current} {p.base_unit || 'pcs'} · Réf: {p.reference}
-                            </p>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  )}
-                  {showProductDropdown && <div className="fixed inset-0 z-10" onClick={() => setShowProductDropdown(false)} />}
-                </div>
 
-                {/* Champ quantité avec virgules */}
+              {/* Recherche produit — pleine largeur sur sa propre ligne */}
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={productSearch}
+                  onChange={(e) => { setProductSearch(e.target.value); setSelectedProductId(''); setShowProductDropdown(true) }}
+                  onFocus={() => setShowProductDropdown(true)}
+                  disabled={isReadOnly}
+                  placeholder="Rechercher un produit..."
+                  className="flex h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+                />
+                {showProductDropdown && (
+                  <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg max-h-64 overflow-y-auto">
+                    {filteredProducts.length === 0 ? (
+                      <p className="px-3 py-2.5 text-sm text-muted-foreground">Aucun produit trouvé</p>
+                    ) : (
+                      filteredProducts.map((p) => (
+                        <button key={p.id} type="button" onClick={() => selectProduct(p)} className="w-full text-left px-3 py-2.5 text-sm hover:bg-orange-50 transition-colors border-b last:border-b-0">
+                          <p className="font-medium text-slate-900">{p.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatCurrency(p.selling_price)} · Stock: {p.stock_current} {p.base_unit || 'pcs'} · Réf: {p.reference}
+                          </p>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+                {showProductDropdown && <div className="fixed inset-0 z-10" onClick={() => setShowProductDropdown(false)} />}
+              </div>
+
+              {/* Quantité, prix et bouton d'ajout — ligne séparée en dessous */}
+              <div className="flex gap-2 mt-2">
                 <input
                   type="number"
                   min="0.001"
@@ -597,7 +597,8 @@ export default function SalesPage() {
                   }}
                   onFocus={(e) => e.target.select()}
                   disabled={isReadOnly}
-                  className="w-20 h-9 rounded-md border border-input bg-background px-3 text-sm text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+                  placeholder="Qté"
+                  className="w-16 h-10 rounded-md border border-input bg-background px-2 text-sm text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
                 />
 
                 {/* Champ prix de vente (ponctuel, modifiable pour cette vente) */}
@@ -611,10 +612,10 @@ export default function SalesPage() {
                   disabled={isReadOnly || !selectedProductId}
                   placeholder={selectedProduct ? String(defaultUnitPrice) : 'Prix'}
                   title="Prix de vente pour cette vente (le prix de base du produit n'est pas modifié)"
-                  className="w-24 h-9 rounded-md border border-input bg-background px-2 text-sm text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+                  className="flex-1 min-w-0 h-10 rounded-md border border-input bg-background px-2 text-sm text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
                 />
 
-                <Button onClick={addToCart} disabled={!selectedProductId || isReadOnly || qty <= 0}>
+                <Button onClick={addToCart} disabled={!selectedProductId || isReadOnly || qty <= 0} className="shrink-0 h-10 w-10 p-0">
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
