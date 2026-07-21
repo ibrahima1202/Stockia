@@ -68,8 +68,20 @@ export function useProducts() {
   }, [])
 
   const load = useCallback(async () => {
+    setIsLoading(true)
+
+    // Si le navigateur sait déjà qu'il n'y a pas de connexion, on va directement au cache
+    // — évite d'attendre l'échec (lent) d'un appel réseau voué à échouer
+    if (!navigator.onLine) {
+      const hasCachedData = await loadFromCache()
+      if (!hasCachedData) {
+        toast.error('Erreur', 'Aucune donnée hors ligne disponible')
+      }
+      setIsLoading(false)
+      return
+    }
+
     try {
-      setIsLoading(true)
       const [prods, cats] = await Promise.all([
         productService.getAll(),
         productService.getCategories(),
@@ -90,7 +102,7 @@ export function useProducts() {
         // Pas de business_id disponible — non bloquant
       }
     } catch {
-      // Échec réseau probable — on tente de servir les données en cache local
+      // Échec réseau (ex: connexion instable détectée trop tard) — on tente le cache
       const hasCachedData = await loadFromCache()
       if (!hasCachedData) {
         toast.error('Erreur', 'Impossible de charger les produits')
