@@ -5,6 +5,7 @@ import { isValidPhoneNumber } from 'libphonenumber-js'
 import { supabase } from '@/lib/supabase'
 import { useSubscription } from '@/hooks/useSubscription'
 
+
 const STEPS = ['Compte', 'Commerce']
 
 // Convertit un code ISO2 (ex: "ML") en emoji drapeau
