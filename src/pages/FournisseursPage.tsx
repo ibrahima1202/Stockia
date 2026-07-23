@@ -14,7 +14,7 @@ import { useRole } from '@/hooks/useRole'
 import { useCommerceType } from '@/hooks/useCommerceType'
 import { useProductUnits } from '@/hooks/useProductUnits'
 import { useNavigate } from 'react-router-dom'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, generateReference } from '@/lib/utils'
 import { pdfService } from '@/services/pdfService'
 import type { Fournisseur, PaymentMethod, AchatCartItem, AchatStatut, ProductUnit } from '@/types'
 
@@ -101,7 +101,7 @@ export default function FournisseursPage() {
 
   const [showNewProduct, setShowNewProduct] = useState(false)
   const [newProductData, setNewProductData] = useState({
-    name: '', reference: '', category_id: '', purchase_price: '', selling_price: ''
+    name: '', category_id: '', purchase_price: '', selling_price: ''
   })
   const [newProductSubmitting, setNewProductSubmitting] = useState(false)
 
@@ -269,12 +269,12 @@ export default function FournisseursPage() {
   }
 
   const handleCreateProduct = async () => {
-    if (!newProductData.name || !newProductData.reference) return
+    if (!newProductData.name) return
     setNewProductSubmitting(true)
     try {
       const product = await createProduct({
         name: newProductData.name,
-        reference: newProductData.reference,
+        reference: generateReference('PRD'),
         category_id: newProductData.category_id || undefined,
         purchase_price: parseFloat(newProductData.purchase_price) || 0,
         selling_price: parseFloat(newProductData.selling_price) || 0,
@@ -283,7 +283,7 @@ export default function FournisseursPage() {
       setSelectedProductId(product.id)
       setAchatUnitPrice(newProductData.purchase_price)
       setShowNewProduct(false)
-      setNewProductData({ name: '', reference: '', category_id: '', purchase_price: '', selling_price: '' })
+      setNewProductData({ name: '', category_id: '', purchase_price: '', selling_price: '' })
     } catch {
     } finally {
       setNewProductSubmitting(false)
@@ -754,11 +754,8 @@ export default function FournisseursPage() {
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium mb-1">Nom *</label>
-                <input type="text" value={newProductData.name} onChange={(e) => setNewProductData({ ...newProductData, name: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Référence *</label>
-                <input type="text" value={newProductData.reference} onChange={(e) => setNewProductData({ ...newProductData, reference: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" />
+                <input type="text" value={newProductData.name} onChange={(e) => setNewProductData({ ...newProductData, name: e.target.value })} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" autoFocus />
+                <p className="text-xs text-muted-foreground mt-1">La référence produit sera générée automatiquement.</p>
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -787,7 +784,7 @@ export default function FournisseursPage() {
             </div>
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setShowNewProduct(false)}>Annuler</Button>
-              <Button className="flex-1" onClick={handleCreateProduct} isLoading={newProductSubmitting}>Créer</Button>
+              <Button className="flex-1" onClick={handleCreateProduct} isLoading={newProductSubmitting} disabled={!newProductData.name.trim()}>Créer</Button>
             </div>
           </div>
         </div>
