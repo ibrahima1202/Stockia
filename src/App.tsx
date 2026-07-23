@@ -20,7 +20,7 @@ import AdminPage from '@/pages/AdminPage'
 import SetupPage from '@/pages/SetupPage'
 import ClientHistoriquePage from '@/pages/ClientHistoriquePage'
 import FournisseurHistoriquePage from '@/pages/FournisseurHistoriquePage'
-
+import ChiffreAffairesPage from '@/pages/ChiffreAffairesPage'
 export default function App() {
   return (
     <BrowserRouter>
@@ -55,6 +55,7 @@ export default function App() {
           <Route path="stats" element={<StatsPage />} />
           <Route path="team" element={<TeamPage />} />
           <Route path="expenses" element={<ExpensesPage />} />
+          <Route path="chiffre-affaires" element={<ChiffreAffairesPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
