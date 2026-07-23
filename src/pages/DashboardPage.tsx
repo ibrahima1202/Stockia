@@ -70,7 +70,10 @@ export default function DashboardPage() {
       {/* 2 grandes cartes principales */}
       <div className="grid grid-cols-2 gap-3">
         {/* CA du jour */}
-        <div className="col-span-1 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-4 text-white shadow-sm">
+        <button
+          onClick={() => navigate('/chiffre-affaires')}
+          className="col-span-1 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-4 text-white shadow-sm text-left hover:from-emerald-600 hover:to-emerald-700 transition-colors"
+        >
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-medium text-emerald-100 uppercase tracking-wide">CA du jour</p>
             <div className="bg-white/20 p-1.5 rounded-lg">
@@ -81,7 +84,7 @@ export default function DashboardPage() {
             {formatCurrency(stats?.revenue_today ?? 0)}
           </p>
           <p className="text-xs text-emerald-100 mt-1">Chiffre d'affaires</p>
-        </div>
+        </button>
 
         {/* Solde caisse */}
         <div className="col-span-1 bg-gradient-to-br from-slate-700 to-slate-900 rounded-xl p-4 text-white shadow-sm">
