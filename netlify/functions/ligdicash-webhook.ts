@@ -1,5 +1,5 @@
-
-import { createClient } from '@supabase/supabase-js'
+  import { createClient } from '@supabase/supabase-js'
+import ws from 'ws'
 
 async function parseBody(request: Request): Promise<{ raw: string; contentType: string; parsed: Record<string, any> }> {
   const contentType = request.headers.get('content-type') || ''
@@ -37,7 +37,8 @@ export default async (request: Request) => {
 
   const supabase = createClient(
     process.env.VITE_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { realtime: { transport: ws as any } }
   )
 
   let body: { raw: string; contentType: string; parsed: Record<string, any> }
