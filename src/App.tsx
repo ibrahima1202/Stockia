@@ -21,6 +21,7 @@ import SetupPage from '@/pages/SetupPage'
 import ClientHistoriquePage from '@/pages/ClientHistoriquePage'
 import FournisseurHistoriquePage from '@/pages/FournisseurHistoriquePage'
 import ChiffreAffairesPage from '@/pages/ChiffreAffairesPage'
+import TestLigdicashPage from '@/pages/TestLigdicashPage'
 export default function App() {
   return (
     <BrowserRouter>
@@ -31,6 +32,11 @@ export default function App() {
         <Route path="/payment" element={
           <ProtectedRoute>
             <PaymentPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/test-ligdicash" element={
+          <ProtectedRoute>
+            <TestLigdicashPage />
           </ProtectedRoute>
         } />
         <Route
