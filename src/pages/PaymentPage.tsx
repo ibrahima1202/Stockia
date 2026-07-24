@@ -86,7 +86,7 @@ export default function PaymentPage() {
     if (!plan || !subscription) return
     setOnlineSubmitting(true)
     try {
-      const response = await fetch('/.netlify/functions/paytech-init', {
+      const response = await fetch('/.netlify/functions/ligdicash-init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -215,7 +215,7 @@ export default function PaymentPage() {
                         <p className="font-bold text-slate-900 text-sm">Payer en ligne</p>
                         <span className="text-[10px] font-bold bg-orange-500 text-white px-2 py-0.5 rounded-full">RECOMMANDÉ</span>
                       </div>
-                      <p className="text-xs text-slate-600 mt-0.5">Wave / Orange Money via Paytech</p>
+                      <p className="text-xs text-slate-600 mt-0.5">Wave / Orange Money via LigdiCash</p>
                       <p className="text-xs text-emerald-600 font-semibold mt-1">⚡ Activation automatique immédiate</p>
                     </div>
                   </button>
@@ -247,9 +247,9 @@ export default function PaymentPage() {
               <div className="space-y-4">
                 <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-center space-y-2">
                   <Zap className="h-8 w-8 text-orange-500 mx-auto" />
-                  <p className="font-bold text-slate-900">Paiement sécurisé via Paytech</p>
+                  <p className="font-bold text-slate-900">Paiement sécurisé via LigdiCash</p>
                   <p className="text-sm text-slate-600">
-                    Vous allez être redirigé vers la plateforme de paiement Paytech pour payer via Wave ou Orange Money.
+                    Vous allez être redirigé vers la plateforme de paiement LigdiCash pour payer via Wave ou Orange Money.
                   </p>
                   <p className="text-xs text-emerald-600 font-semibold">
                     ⚡ Votre abonnement sera activé automatiquement après le paiement !
@@ -281,7 +281,7 @@ export default function PaymentPage() {
                 </Button>
 
                 <p className="text-xs text-center text-slate-400">
-                  Vous serez redirigé vers Paytech pour finaliser votre paiement
+                  Vous serez redirigé vers LigdiCash pour finaliser votre paiement
                 </p>
               </div>
             )}
