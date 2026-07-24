@@ -34,7 +34,7 @@ export default async (request: Request) => {
         actions: {
           cancel_url: `${process.env.URL}/subscription`,
           return_url: `${process.env.URL}/payment-success`,
-          callback_url: `${process.env.URL}/.netlify/functions/ligdicash-webhook`,
+          callback_url: `${process.env.URL}/api/ligdicash-webhook`,
         },
         custom_data: {
           subscriptionId,
